@@ -1,0 +1,83 @@
+# Compiled object files
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Executable files
+*.exe
+*.out
+*.app
+
+# Build directories
+build/
+cmake-build-*/
+out/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Visual Studio files
+*.sln
+*.vcxproj*
+*.user
+*.ipch
+*.opensdf
+*.suo
+*.ncb
+
+# Xcode files
+*.xcworkspace
+*.xcuserstate
+*.xcodeproj
+
+# CodeBlocks
+*.depend
+*.layout
+
+# Qt files
+*.moc
+*.qrc
+*.qmlc
+
+# CLion files
+.idea/
+
+# Sublime Text files
+*.sublime-project
+*.sublime-workspace
+
+# Vim temporary files
+*.swp
+*.swo
+
+# Emacs temporary files
+*~
+\#*\#
+
+# Mac OS specific files
+.DS_Store
+
+# Linux specific files
+.directory
+
+# Log files
+*.log
+
+# Backup files
+*.bak
+*.old
