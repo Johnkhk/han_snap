@@ -1,7 +1,9 @@
 #include "../include/clipboard_processor.h"
 #include <wx/wx.h>
 #include <wx/filename.h>
+#include <wx/taskbar.h>
 #include <memory>
+#include "../include/taskbar.h"
 
 // MainFrame class that listens for clipboard events.
 class MainFrame : public wxFrame
@@ -36,7 +38,28 @@ public:
         );
         m_clipboardProcessor->Start();
         
+        // Create and setup taskbar icon
+        m_taskBarIcon = new MyTaskBarIcon(this);
+        
+        // Load an icon file
+        wxIcon icon;
+        if (icon.LoadFile("../assets/images/app_icon.png", wxBITMAP_TYPE_PNG)) {
+            m_taskBarIcon->SetIcon(icon, "Clipboard Monitor");
+        }
+        
+        // Connect close event to hide instead of closing
+        Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
+        
         SetSize(600, 400);
+    }
+    
+    ~MainFrame()
+    {
+        // Clean up taskbar icon
+        if (m_taskBarIcon)
+        {
+            delete m_taskBarIcon;
+        }
     }
 
 private:
@@ -64,10 +87,27 @@ private:
         // Resize the image display if needed
         Layout();
     }
+    
+    // Handle window close event
+    void OnClose(wxCloseEvent& event)
+    {
+        if (event.CanVeto())
+        {
+            // Hide the window instead of closing when user clicks the X
+            Hide();
+            event.Veto();
+        }
+        else
+        {
+            // Actually destroy the frame if we can't veto
+            Destroy();
+        }
+    }
 
     // UI elements
     wxTextCtrl* m_textDisplay;
     wxStaticBitmap* m_imageDisplay;
+    MyTaskBarIcon* m_taskBarIcon;
     
     // Unique pointer to the ClipboardProcessor instance.
     std::unique_ptr<ClipboardProcessor> m_clipboardProcessor;
