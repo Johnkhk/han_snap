@@ -27,6 +27,7 @@ endif()
 # Add the source files
 add_executable(han_snap_app 
     src/main.cpp
+    src/main_frame.cpp
     src/screenshot.cpp
     src/hotkey.cpp
     src/filemonitor.cpp
