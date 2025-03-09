@@ -21,7 +21,7 @@ public:
     bool Start(int checkIntervalMs = 500);
     
     // Stop monitoring the clipboard
-    void Stop();
+    void Stop() override;
 
     // Check clipboard content (can be called manually)
     bool ProcessClipboard();
@@ -30,20 +30,36 @@ private:
     // wxTimer notification override
     void Notify() override;
 
-    // Store last clipboard content to detect changes
-    wxString m_lastClipboardContent;
+    // Format detection methods
+    void LogAvailableFormats();
+    bool HasFormatType(const wxDataFormat& format);
+    bool HasFormatName(const wxString& formatId);
+    bool HasTextFormat();
+    bool HasImageFormat();
     
-    // Callback functions for different data types
+    // Text processing methods
+    bool ProcessTextFormat();
+    wxString GetClipboardText();
+    
+    // Image processing methods
+    bool ProcessImageFormat();
+    bool ProcessBitmapFormat();
+    wxBitmap GetClipboardImage();
+    
+    #ifdef __WXMAC__
+    bool ProcessPngFormat();
+    bool ProcessTiffFormat();
+    bool TryImageFromMemoryStream(const void* data, size_t len, wxBitmapType type = wxBITMAP_TYPE_PNG);
+    bool TryImageFromTempFile(const void* data, size_t len, const wxString& extension);
+    #endif
+    
+    bool TryGetImageFromClipboard(wxBitmap& bitmap);
+
+    // Member variables
+    wxString m_lastClipboardContent;
     std::function<void(const wxString&)> m_textCallback;
     std::function<void(const wxBitmap&)> m_imageCallback;
-    
-    // Flag to track if we're initialized
     bool m_initialized;
-    
-    // Helper methods
-    wxString GetClipboardText();
-    wxBitmap GetClipboardImage();
-    bool TryGetImageFromClipboard(wxBitmap& bitmap);
 };
 
 #endif // CLIPBOARD_PROCESSOR_H
