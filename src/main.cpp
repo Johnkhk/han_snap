@@ -1,83 +1,89 @@
+#include "../include/clipboard_processor.h"
 #include <wx/wx.h>
-#include <wx/clipbrd.h>
-#include <wx/image.h>
-#include "../include/screenshot.h"
-#include "../include/hotkey.h"
+#include <wx/filename.h>
+#include <memory>
 
-// Define event IDs at global scope
-enum {
-    ID_SCREENSHOT = 1
-};
-
-// Main application frame
-class MainFrame : public wxFrame {
+// MainFrame class that listens for clipboard events.
+class MainFrame : public wxFrame
+{
 public:
-    MainFrame(const wxString& title);
+    MainFrame()
+        : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor Test")
+    {
+        // First create the status bar
+        CreateStatusBar();
+        SetStatusText("Monitoring clipboard...");
+        
+        // Create a text control to display clipboard content
+        m_textDisplay = new wxTextCtrl(this, wxID_ANY, wxEmptyString, 
+                                     wxDefaultPosition, wxDefaultSize,
+                                     wxTE_MULTILINE | wxTE_READONLY);
+        
+        // Create a bitmap display for images
+        m_imageDisplay = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
+        
+        // Create layout
+        wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+        sizer->Add(m_textDisplay, 1, wxEXPAND | wxALL, 5);
+        sizer->Add(m_imageDisplay, 2, wxEXPAND | wxALL, 5);
+        SetSizer(sizer);
+        
+        // Initialize and start clipboard processor
+        m_clipboardProcessor = std::make_unique<ClipboardProcessor>();
+        m_clipboardProcessor->Initialize(
+            [this](const wxString& text) { OnClipboardText(text); },
+            [this](const wxBitmap& image) { OnClipboardImage(image); }
+        );
+        m_clipboardProcessor->Start();
+        
+        SetSize(600, 400);
+    }
 
 private:
-    void OnScreenshot(wxCommandEvent& event);
-    void ProcessScreenshot(wxBitmap screenshot); // Placeholder for future implementation
+    // Event handler for clipboard text
+    void OnClipboardText(const wxString& text)
+    {
+        m_textDisplay->SetValue(text);
+        SetStatusText("Clipboard contains text (" + wxString::Format("%zu", text.length()) + " characters)");
+        
+        // Hide the image display when showing text
+        m_imageDisplay->SetBitmap(wxNullBitmap);
+    }
+    
+    // Event handler for clipboard images
+    void OnClipboardImage(const wxBitmap& image)
+    {
+        wxLogDebug("Clipboard image: %d x %d", image.GetWidth(), image.GetHeight());
+        m_imageDisplay->SetBitmap(image);
+        SetStatusText(wxString::Format("Clipboard contains image (%d x %d)", 
+                                     image.GetWidth(), image.GetHeight()));
+        
+        // Clear text display when showing image
+        m_textDisplay->Clear();
+        
+        // Resize the image display if needed
+        Layout();
+    }
 
-    wxPanel* m_panel;
-    wxStaticBitmap* m_imageCtrl;
-    wxTextCtrl* m_pinyinText;
-    wxTextCtrl* m_meaningText;
-
-    wxDECLARE_EVENT_TABLE();
+    // UI elements
+    wxTextCtrl* m_textDisplay;
+    wxStaticBitmap* m_imageDisplay;
+    
+    // Unique pointer to the ClipboardProcessor instance.
+    std::unique_ptr<ClipboardProcessor> m_clipboardProcessor;
 };
 
-wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
-    EVT_BUTTON(ID_SCREENSHOT, MainFrame::OnScreenshot)
-wxEND_EVENT_TABLE()
-
-// Main application class
-class HanSnapApp : public wxApp {
-public:
-    virtual bool OnInit();
-    MainFrame* frame = nullptr;
-};
-
-wxIMPLEMENT_APP(HanSnapApp);
-
-bool HanSnapApp::OnInit() {
-    // Initialize image handlers
-    wxImage::AddHandler(new wxPNGHandler());
-    wxImage::AddHandler(new wxJPEGHandler());
-
-    // Create main frame and show it
-    frame = new MainFrame("Han Snap - Chinese Character Recognition");
-    frame->Show(true);
-
-    return true;
-}
-
-MainFrame::MainFrame(const wxString& title)
-    : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(400, 300))
+// The main application class.
+class MyApp : public wxApp
 {
-    m_panel = new wxPanel(this, wxID_ANY);
+public:
+    virtual bool OnInit() override
+    {
+        MainFrame* frame = new MainFrame();
+        frame->Show(true);
+        return true;
+    }
+};
 
-    // Create a button called "Take Screenshot"
-    wxButton* screenshotButton = new wxButton(
-        m_panel, 
-        ID_SCREENSHOT, 
-        wxT("Take Screenshot"), 
-        wxPoint(20, 20), 
-        wxSize(150, 40)
-    );
-}
-
-void MainFrame::OnScreenshot(wxCommandEvent& event) {
-    // For now, simply show a message box to indicate the button was clicked.
-    // wxMessageBox("Take Screenshot button clicked!", "Info", wxOK | wxICON_INFORMATION);
-    LaunchScreenshotTool([this](wxBitmap screenshot) {
-        // Process the screenshot bitmap. For now, we just call ProcessScreenshot.
-        ProcessScreenshot(screenshot);
-    });
-}
-
-void MainFrame::ProcessScreenshot(wxBitmap screenshot) {
-    // Future implementation: Process the screenshot.
-
-    // For now save the screenshot to a file
-    screenshot.SaveFile("screenshot.png", wxBITMAP_TYPE_PNG);
-}
+// Macro that defines the main() entry point.
+wxIMPLEMENT_APP(MyApp);

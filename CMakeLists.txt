@@ -29,6 +29,8 @@ add_executable(han_snap_app
     src/main.cpp
     src/screenshot.cpp
     src/hotkey.cpp
+    src/filemonitor.cpp
+    src/clipboard_processor.cpp
 )
 
 target_link_libraries(han_snap_app PRIVATE ${wxWidgets_LIBRARIES} ${EXTRA_LIBS})
