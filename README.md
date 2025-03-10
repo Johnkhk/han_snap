@@ -43,3 +43,9 @@
    cmake --build . && .\Debug\han_snap_app.exe
    ```
 
+
+
+## Just running LLM.cpp
+```
+g++ -o myapp src/llm.cpp -std=c++17 -I/opt/homebrew/include -lcurl
+```

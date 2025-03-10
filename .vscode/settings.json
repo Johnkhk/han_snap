@@ -4,6 +4,8 @@
         "*.ndjson": "jsonl",
         "*.dbclient-js": "javascript",
         "functional": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "string": "cpp",
+        "iosfwd": "cpp"
     }
 }
