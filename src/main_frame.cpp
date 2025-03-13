@@ -1,115 +1,138 @@
 #include "../include/main_frame.h"
 
 MainFrame::MainFrame()
-    : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor Test")
+    : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor", wxDefaultPosition, wxSize(800, 600)),
+      m_lastProcessedTimestamp(wxDateTime::Now())  // Initialize with current time
 {
-    // First create the status bar
-    CreateStatusBar();
-    SetStatusText("Monitoring clipboard...");
+    // Create UI components
+    wxPanel* panel = new wxPanel(this);
+    wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
     
-    // Create a text control to display clipboard content
-    m_textDisplay = new wxTextCtrl(this, wxID_ANY, wxEmptyString, 
-                                 wxDefaultPosition, wxDefaultSize,
-                                 wxTE_MULTILINE | wxTE_READONLY);
+    // Add timestamp display
+    m_timestampDisplay = new wxStaticText(panel, wxID_ANY, "No clipboard content yet");
+    mainSizer->Add(m_timestampDisplay, 0, wxEXPAND | wxALL, 5);
     
-    // Create a bitmap display for images
-    m_imageDisplay = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
+    // Text display
+    m_textDisplay = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, 
+                                  wxTE_MULTILINE | wxTE_READONLY);
+    mainSizer->Add(m_textDisplay, 1, wxEXPAND | wxALL, 5);
     
-    // Create layout
-    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
-    sizer->Add(m_textDisplay, 1, wxEXPAND | wxALL, 5);
-    sizer->Add(m_imageDisplay, 2, wxEXPAND | wxALL, 5);
-    SetSizer(sizer);
+    // Image display
+    m_imageDisplay = new wxStaticBitmap(panel, wxID_ANY, wxNullBitmap);
+    mainSizer->Add(m_imageDisplay, 2, wxEXPAND | wxALL, 5);
     
-    // Initialize and start clipboard processor
-    m_clipboardProcessor = std::make_unique<ClipboardProcessor>();
-    m_clipboardProcessor->Initialize(
-        [this](const wxString& text) { OnClipboardText(text); },
-        [this](const wxBitmap& image) { OnClipboardImage(image); }
-    );
-    m_clipboardProcessor->Start();
+    panel->SetSizer(mainSizer);
     
-    // Create and setup taskbar icon
+    // Create taskbar icon
     m_taskBarIcon = new MyTaskBarIcon(this);
     
-    // Load an icon file
-    wxIcon icon;
-    if (icon.LoadFile("../assets/images/app_icon.png", wxBITMAP_TYPE_PNG)) {
-        m_taskBarIcon->SetIcon(icon, "Clipboard Monitor");
-    }
-    
-    // Connect close event to hide instead of closing
+    // Bind events
     Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
     
-    // Bind the taskbar toggle event
-    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainFrame::OnToggleApp, this, MyTaskBarIcon::ID_TOGGLE_APP);
+    // Initialize clipboard processor with callbacks that include timestamps
+    m_clipboardProcessor = std::make_unique<ClipboardProcessor>();
+    m_clipboardProcessor->Initialize(
+        [this](const wxString& text, const wxDateTime& timestamp) { 
+            // Only process if timestamp is newer than last processed timestamp
+            if (timestamp > m_lastProcessedTimestamp) {
+                OnClipboardText(text, timestamp);
+                m_lastProcessedTimestamp = timestamp;
+            }
+        },
+        [this](const wxBitmap& image, const wxDateTime& timestamp) {
+            // Only process if timestamp is newer than last processed timestamp
+            if (timestamp > m_lastProcessedTimestamp) {
+                OnClipboardImage(image, timestamp);
+                m_lastProcessedTimestamp = timestamp;
+            }
+        }
+    );
     
-    SetSize(600, 400);
+    // Start monitoring clipboard
+    m_clipboardProcessor->Start();
+    
+    // Center the window
+    Centre();
 }
 
 MainFrame::~MainFrame()
 {
-    // Clean up taskbar icon
-    if (m_taskBarIcon)
-    {
+    // Clean up
+    if (m_taskBarIcon) {
+        m_taskBarIcon->RemoveIcon();
         delete m_taskBarIcon;
-    }
-}
-
-void MainFrame::OnClipboardText(const wxString& text)
-{
-    m_textDisplay->SetValue(text);
-    SetStatusText("Clipboard contains text (" + wxString::Format("%zu", text.length()) + " characters)");
-    
-    // Hide the image display when showing text
-    m_imageDisplay->SetBitmap(wxNullBitmap);
-}
-
-void MainFrame::OnClipboardImage(const wxBitmap& image)
-{
-    wxLogDebug("Clipboard image: %d x %d", image.GetWidth(), image.GetHeight());
-    m_imageDisplay->SetBitmap(image);
-    SetStatusText(wxString::Format("Clipboard contains image (%d x %d)", 
-                                 image.GetWidth(), image.GetHeight()));
-    
-    // Clear text display when showing image
-    m_textDisplay->Clear();
-    
-    // Resize the image display if needed
-    Layout();
-}
-
-void MainFrame::OnClose(wxCloseEvent& event)
-{
-    if (event.CanVeto())
-    {
-        // Hide the window instead of closing when user clicks the X
-        Hide();
-        event.Veto();
-    }
-    else
-    {
-        // Actually destroy the frame if we can't veto
-        Destroy();
     }
 }
 
 void MainFrame::OnToggleApp(wxCommandEvent& event)
 {
+    // Check if we're enabling or disabling the app
     bool isEnabled = (event.GetInt() == 1);
     
-    // Enable or disable clipboard monitoring based on isEnabled
     if (isEnabled) {
+        // We're turning the app back on
+        // Update the timestamp to current time to avoid processing old content
+        m_lastProcessedTimestamp = wxDateTime::Now();
+        
         // Start clipboard monitoring
         m_clipboardProcessor->Start();
-        SetStatusText("Monitoring clipboard...");
-        // Show the window when app is enabled
+        
+        // Show the window
         Show();
+        Raise();
     } else {
+        // We're turning the app off
         // Stop clipboard monitoring
         m_clipboardProcessor->Stop();
-        SetStatusText("Clipboard monitoring paused");
-        // Hide the window when app is disabled
+        
+        // Hide the window
         Hide();
     }
+}
+
+void MainFrame::OnClose(wxCloseEvent& event)
+{
+    // Hide instead of close if the taskbar icon is present
+    if (m_taskBarIcon && m_taskBarIcon->IsIconInstalled()) {
+        Hide();
+    } else {
+        // Actually close
+        Destroy();
+    }
+}
+
+void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestamp)
+{
+    // Update the timestamp display
+    wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
+    m_timestampDisplay->SetLabel("Text copied at: " + timeStr);
+    
+    // Update text display
+    m_textDisplay->SetValue(text);
+    m_textDisplay->Show();
+    
+    // Hide image display
+    m_imageDisplay->SetBitmap(wxNullBitmap);
+    m_imageDisplay->Hide();
+    
+    // Update layout
+    Layout();
+}
+
+void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timestamp)
+{
+    // Update the timestamp display
+    wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
+    m_timestampDisplay->SetLabel("Image copied at: " + timeStr);
+    
+    // Hide text display
+    m_textDisplay->Clear();
+    m_textDisplay->Hide();
+    
+    // Update image display
+    m_imageDisplay->SetBitmap(image);
+    m_imageDisplay->Show();
+    
+    // Update layout
+    Layout();
 } 

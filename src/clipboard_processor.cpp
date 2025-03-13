@@ -4,12 +4,29 @@
 #include <wx/image.h>    // for wxImage loading from stream
 #include <wx/file.h>
 #include <wx/filename.h>  // For wxFileName
+#include <wx/datetime.h> // For timestamp functionality
+
+// Define a struct to hold clipboard content with timestamp
+struct ClipboardData {
+    wxString textContent;
+    wxBitmap imageContent;
+    bool hasText;
+    bool hasImage;
+    wxDateTime timestamp;
+    
+    ClipboardData() : hasText(false), hasImage(false) {
+        timestamp = wxDateTime::Now();
+    }
+};
 
 ClipboardProcessor::ClipboardProcessor()
     : m_initialized(false)
 {
     // Make sure image handlers are initialized
     wxInitAllImageHandlers();
+    
+    // Initialize the current clipboard data
+    m_clipboardData = std::make_shared<ClipboardData>();
 }
 
 ClipboardProcessor::~ClipboardProcessor()
@@ -17,8 +34,8 @@ ClipboardProcessor::~ClipboardProcessor()
     Stop();
 }
 
-bool ClipboardProcessor::Initialize(std::function<void(const wxString&)> textCallback, 
-                                   std::function<void(const wxBitmap&)> imageCallback)
+bool ClipboardProcessor::Initialize(std::function<void(const wxString&, const wxDateTime&)> textCallback, 
+                                   std::function<void(const wxBitmap&, const wxDateTime&)> imageCallback)
 {
     if (m_initialized)
         return true;
@@ -204,9 +221,15 @@ bool ClipboardProcessor::ProcessTextFormat()
         wxLogDebug("Clipboard text content changed");
         m_lastClipboardContent = clipboardText;
         
+        // Update clipboard data with timestamp
+        m_clipboardData = std::make_shared<ClipboardData>();
+        m_clipboardData->textContent = clipboardText;
+        m_clipboardData->hasText = true;
+        m_clipboardData->timestamp = wxDateTime::Now();
+        
         // Call the text callback if provided
         if (m_textCallback) {
-            m_textCallback(clipboardText);
+            m_textCallback(clipboardText, m_clipboardData->timestamp);
         }
         return true;
     }
@@ -232,19 +255,66 @@ wxString ClipboardProcessor::GetClipboardText()
 
 bool ClipboardProcessor::ProcessImageFormat()
 {
+    wxBitmap newImage;
+    bool gotImage = false;
+    
+    // Try to get the image in various formats
     if (HasFormatType(wxDF_BITMAP)) {
-        return ProcessBitmapFormat();
+        wxBitmapDataObject data;
+        if (wxTheClipboard->GetData(data)) {
+            newImage = data.GetBitmap();
+            gotImage = newImage.IsOk();
+        }
     }
     
     #ifdef __WXMAC__
-    if (HasFormatName("public.png") || HasFormatName("PNG") || HasFormatName("image/png")) {
-        return ProcessPngFormat();
-    }
-    
-    if (HasFormatName("public.tiff")) {
-        return ProcessTiffFormat();
+    // Try Mac-specific formats if standard bitmap format didn't work
+    if (!gotImage) {
+        if (HasFormatName("public.png") || HasFormatName("PNG") || HasFormatName("image/png")) {
+            gotImage = ProcessPngFormat();
+            return gotImage; // Mac format handlers call the callback directly
+        }
+        
+        if (HasFormatName("public.tiff")) {
+            gotImage = ProcessTiffFormat();
+            return gotImage; // Mac format handlers call the callback directly
+        }
     }
     #endif
+    
+    // If we successfully got an image, check if it's new and process it
+    if (gotImage && newImage.IsOk()) {
+        wxLogDebug("Clipboard contains a bitmap image: %d x %d", 
+                  newImage.GetWidth(), newImage.GetHeight());
+        
+        // Check if this is a new image
+        bool isNewImage = false;
+        
+        if (!m_clipboardData || !m_clipboardData->hasImage) {
+            isNewImage = true;
+        } else {
+            // Compare images by size (this is a simple heuristic)
+            // A more accurate method would be to compare the actual pixels
+            if (m_clipboardData->imageContent.GetWidth() != newImage.GetWidth() ||
+                m_clipboardData->imageContent.GetHeight() != newImage.GetHeight()) {
+                isNewImage = true;
+            }
+        }
+        
+        if (isNewImage) {
+            // Update clipboard data with timestamp only for new images
+            m_clipboardData = std::make_shared<ClipboardData>();
+            m_clipboardData->imageContent = newImage;
+            m_clipboardData->hasImage = true;
+            m_clipboardData->timestamp = wxDateTime::Now();
+            
+            // Call the image callback if provided
+            if (m_imageCallback) {
+                m_imageCallback(newImage, m_clipboardData->timestamp);
+            }
+            return true;
+        }
+    }
     
     return false;
 }
@@ -254,13 +324,10 @@ bool ClipboardProcessor::ProcessBitmapFormat()
     wxBitmap clipboardImage = GetClipboardImage();
     
     if (clipboardImage.IsOk()) {
-        wxLogDebug("Clipboard contains a bitmap image: %d x %d", 
+        wxLogDebug("Processing bitmap format: %d x %d", 
                   clipboardImage.GetWidth(), clipboardImage.GetHeight());
         
-        // Call the image callback if provided
-        if (m_imageCallback) {
-            m_imageCallback(clipboardImage);
-        }
+        // The comparison and callback is now handled in ProcessImageFormat
         return true;
     }
     
@@ -359,7 +426,7 @@ bool ClipboardProcessor::TryImageFromMemoryStream(const void* data, size_t len, 
                   bitmap.GetWidth(), bitmap.GetHeight());
         
         if (m_imageCallback && bitmap.IsOk()) {
-            m_imageCallback(bitmap);
+            m_imageCallback(bitmap, wxDateTime::Now());
             return true;
         }
     } else {
@@ -393,7 +460,7 @@ bool ClipboardProcessor::TryImageFromTempFile(const void* data, size_t len, cons
                   bitmap.GetWidth(), bitmap.GetHeight());
         
         if (m_imageCallback && bitmap.IsOk()) {
-            m_imageCallback(bitmap);
+            m_imageCallback(bitmap, wxDateTime::Now());
             return true;
         }
     } else {
@@ -416,4 +483,23 @@ bool ClipboardProcessor::TryGetImageFromClipboard(wxBitmap& bitmap)
     }
     
     return false;
+}
+
+// Add new accessor methods for clipboard data with timestamps
+wxDateTime ClipboardProcessor::GetCurrentTimestamp() const
+{
+    return m_clipboardData->timestamp;
+}
+
+std::shared_ptr<ClipboardData> ClipboardProcessor::GetCurrentClipboardData() const
+{
+    return m_clipboardData;
+}
+
+wxString ClipboardProcessor::GetTimestampString() const
+{
+    if (m_clipboardData) {
+        return m_clipboardData->timestamp.Format("%Y-%m-%d %H:%M:%S");
+    }
+    return wxEmptyString;
 }

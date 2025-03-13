@@ -4,8 +4,13 @@
 #include <wx/wx.h>
 #include <wx/clipbrd.h>
 #include <wx/timer.h>
+#include <wx/datetime.h>
 #include <functional>
 #include <string>
+#include <memory>
+
+// Forward declaration
+struct ClipboardData;
 
 class ClipboardProcessor : public wxTimer
 {
@@ -14,8 +19,9 @@ public:
     virtual ~ClipboardProcessor();
 
     // Initialize the processor with optional callbacks for different data types
-    bool Initialize(std::function<void(const wxString&)> textCallback = nullptr,
-                   std::function<void(const wxBitmap&)> imageCallback = nullptr);
+    // Now including timestamps in callbacks
+    bool Initialize(std::function<void(const wxString&, const wxDateTime&)> textCallback = nullptr,
+                   std::function<void(const wxBitmap&, const wxDateTime&)> imageCallback = nullptr);
     
     // Start monitoring the clipboard
     bool Start(int checkIntervalMs = 500);
@@ -25,6 +31,11 @@ public:
 
     // Check clipboard content (can be called manually)
     bool ProcessClipboard();
+    
+    // Timestamp accessors
+    wxDateTime GetCurrentTimestamp() const;
+    std::shared_ptr<ClipboardData> GetCurrentClipboardData() const;
+    wxString GetTimestampString() const;
 
 private:
     // wxTimer notification override
@@ -57,9 +68,10 @@ private:
 
     // Member variables
     wxString m_lastClipboardContent;
-    std::function<void(const wxString&)> m_textCallback;
-    std::function<void(const wxBitmap&)> m_imageCallback;
+    std::function<void(const wxString&, const wxDateTime&)> m_textCallback;
+    std::function<void(const wxBitmap&, const wxDateTime&)> m_imageCallback;
     bool m_initialized;
+    std::shared_ptr<ClipboardData> m_clipboardData;
 };
 
 #endif // CLIPBOARD_PROCESSOR_H
