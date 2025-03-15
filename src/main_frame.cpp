@@ -53,6 +53,16 @@ MainFrame::MainFrame()
     
     // Center the window
     Centre();
+
+        // Create and setup taskbar icon
+    m_taskBarIcon = new MyTaskBarIcon(this);
+    
+    // Load an icon file
+    wxIcon icon;
+    if (icon.LoadFile("../assets/images/app_icon.png", wxBITMAP_TYPE_PNG)) {
+        m_taskBarIcon->SetIcon(icon, "Clipboard Monitor");
+    }
+    
 }
 
 MainFrame::~MainFrame()

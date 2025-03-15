@@ -269,18 +269,23 @@ bool ClipboardProcessor::ProcessImageFormat()
     
     #ifdef __WXMAC__
     // Try Mac-specific formats if standard bitmap format didn't work
+    wxLogDebug("000000000000000000000000");
     if (!gotImage) {
         if (HasFormatName("public.png") || HasFormatName("PNG") || HasFormatName("image/png")) {
             gotImage = ProcessPngFormat();
-            return gotImage; // Mac format handlers call the callback directly
+            // return gotImage; // Mac format handlers call the callback directly
         }
         
         if (HasFormatName("public.tiff")) {
             gotImage = ProcessTiffFormat();
-            return gotImage; // Mac format handlers call the callback directly
+            // return gotImage; // Mac format handlers call the callback directly
         }
     }
     #endif
+    wxLogDebug("999999999999999999999999");
+    // Log the status of image retrieval
+    wxLogDebug("Image retrieval status: gotImage=%d, newImage.IsOk()=%d", 
+              gotImage, newImage.IsOk());
     
     // If we successfully got an image, check if it's new and process it
     if (gotImage && newImage.IsOk()) {
@@ -289,15 +294,37 @@ bool ClipboardProcessor::ProcessImageFormat()
         
         // Check if this is a new image
         bool isNewImage = false;
+        wxLogDebug("111111111111111111111111");
         
         if (!m_clipboardData || !m_clipboardData->hasImage) {
             isNewImage = true;
+            wxLogDebug("222222222222222222222222");
         } else {
-            // Compare images by size (this is a simple heuristic)
-            // A more accurate method would be to compare the actual pixels
+            // Always treat as new image if dimensions changed
+            wxLogDebug("333333333333333333333333");
             if (m_clipboardData->imageContent.GetWidth() != newImage.GetWidth() ||
                 m_clipboardData->imageContent.GetHeight() != newImage.GetHeight()) {
                 isNewImage = true;
+            } else {
+                // Compare actual image data for images of same size
+                // We'll use a simple hash-based approach by converting to PNG and checking size
+                wxMemoryOutputStream stream1;
+                wxMemoryOutputStream stream2;
+                m_clipboardData->imageContent.ConvertToImage().SaveFile(stream1, wxBITMAP_TYPE_PNG);
+                newImage.ConvertToImage().SaveFile(stream2, wxBITMAP_TYPE_PNG);
+                
+                if (stream1.GetLength() != stream2.GetLength()) {
+                    isNewImage = true;
+                } else {
+                    // Compare first few bytes as an additional check
+                    const size_t bytesToCheck = std::min<size_t>(static_cast<size_t>(stream1.GetLength()), static_cast<size_t>(1024));
+                    wxStreamBuffer* buf1 = stream1.GetOutputStreamBuffer();
+                    wxStreamBuffer* buf2 = stream2.GetOutputStreamBuffer();
+                    
+                    if (memcmp(buf1->GetBufferStart(), buf2->GetBufferStart(), bytesToCheck) != 0) {
+                        isNewImage = true;
+                    }
+                }
             }
         }
         
