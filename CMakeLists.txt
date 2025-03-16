@@ -9,8 +9,42 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(wxWidgets REQUIRED COMPONENTS core base)
 include(${wxWidgets_USE_FILE})
 
-# Add include directory
-include_directories(${CMAKE_SOURCE_DIR}/include)
+# Direct Homebrew path
+set(HOMEBREW_PATH "/opt/homebrew")
+
+# Add include directories
+include_directories(
+    ${CMAKE_SOURCE_DIR}/include
+    ${HOMEBREW_PATH}/include
+)
+
+# Print all files in the lib directory to debug
+message(STATUS "Listing files in ${HOMEBREW_PATH}/lib:")
+file(GLOB LIB_FILES "${HOMEBREW_PATH}/lib/*")
+foreach(F IN LISTS LIB_FILES)
+    message(STATUS "Found library file: ${F}")
+endforeach()
+
+# Find Tesseract library
+find_library(TESSERACT_LIBRARY
+    NAMES tesseract
+    PATHS ${HOMEBREW_PATH}/lib
+    REQUIRED)
+
+# Find Leptonica library - try different possible names and patterns
+find_library(LEPTONICA_LIBRARY
+    NAMES lept liblept.dylib liblept.a liblept leptonica
+    PATHS 
+        ${HOMEBREW_PATH}/lib
+        ${HOMEBREW_PATH}/Cellar/leptonica/*/lib
+    NO_DEFAULT_PATH)
+
+if(NOT LEPTONICA_LIBRARY)
+    message(FATAL_ERROR "Leptonica library not found. Please install it with 'brew install leptonica'")
+endif()
+
+message(STATUS "Found Tesseract lib: ${TESSERACT_LIBRARY}")
+message(STATUS "Found Leptonica lib: ${LEPTONICA_LIBRARY}")
 
 # Platform-specific settings
 if(APPLE)
@@ -33,9 +67,15 @@ add_executable(han_snap_app
     src/filemonitor.cpp
     src/clipboard_processor.cpp
     src/taskbar.cpp
+    src/ocr.cpp
 )
 
-target_link_libraries(han_snap_app PRIVATE ${wxWidgets_LIBRARIES} ${EXTRA_LIBS})
+target_link_libraries(han_snap_app PRIVATE 
+    ${wxWidgets_LIBRARIES} 
+    ${EXTRA_LIBS}
+    ${TESSERACT_LIBRARY}
+    ${LEPTONICA_LIBRARY}
+)
 
 # Add the examples
 add_executable(hello_world examples/hello_world.cpp)

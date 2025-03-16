@@ -1,4 +1,5 @@
 #include "../include/main_frame.h"
+#include "../include/ocr.h"
 
 MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor", wxDefaultPosition, wxSize(800, 600)),
@@ -63,6 +64,32 @@ MainFrame::MainFrame()
         m_taskBarIcon->SetIcon(icon, "Clipboard Monitor");
     }
     
+    // For Simplified Chinese
+    // if (!OcrEngine::IsInitialized()) {
+    //     if (!OcrEngine::Initialize("chi_sim")) {
+    //         wxLogError("Failed to initialize OCR engine for Simplified Chinese");
+    //     } else {
+    //         // wxLogMessage("OCR engine initialized for Simplified Chinese");
+    //     }
+    // }
+    
+    // For Traditional Chinese
+    // if (!OcrEngine::IsInitialized()) {
+    //     if (!OcrEngine::Initialize("chi_tra")) {
+    //         wxLogError("Failed to initialize OCR engine for Traditional Chinese");
+    //     } else {
+    //         wxLogMessage("OCR engine initialized for Traditional Chinese");
+    //     }
+    // }
+
+    if (!OcrEngine::IsInitialized()) {
+    // Both Simplified (chi_sim) and Traditional (chi_tra) Chinese
+    if (!OcrEngine::Initialize("chi_sim+chi_tra")) {
+        wxLogError("Failed to initialize OCR engine for Simplified and Traditional Chinese");
+    } else {
+        // wxLogMessage("OCR engine initialized for Simplified and Traditional Chinese");
+    }
+}
 }
 
 MainFrame::~MainFrame()
@@ -142,6 +169,20 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     // Update image display
     m_imageDisplay->SetBitmap(image);
     m_imageDisplay->Show();
+    
+    // Perform OCR on the image
+    if (!OcrEngine::IsInitialized()) {
+        if (!OcrEngine::Initialize("chi_sim")) {
+            wxLogError("Failed to initialize OCR engine for Simplified Chinese");
+        } else {
+            wxLogMessage("OCR engine initialized for Simplified Chinese");
+        }
+    }
+    
+    if (OcrEngine::IsInitialized()) {
+        wxString recognizedText = OcrEngine::ExtractTextFromBitmap(image);
+        wxLogDebug("OCR Text: %s", recognizedText);
+    }
     
     // Update layout
     Layout();
