@@ -58,10 +58,12 @@ private:
     wxBitmap GetClipboardImage();
     
     #ifdef __WXMAC__
-    bool ProcessPngFormat();
-    bool ProcessTiffFormat();
-    bool TryImageFromMemoryStream(const void* data, size_t len, wxBitmapType type = wxBITMAP_TYPE_PNG);
-    bool TryImageFromTempFile(const void* data, size_t len, const wxString& extension);
+    // bool ProcessPngFormat();
+    // bool ProcessTiffFormat();
+    // bool TryImageFromMemoryStream(const void* data, size_t len, wxBitmapType type = wxBITMAP_TYPE_PNG);
+    // bool TryImageFromTempFile(const void* data, size_t len, const wxString& extension);
+    bool GetPngImage(wxBitmap& bitmap);
+    bool GetTiffImage(wxBitmap& bitmap);
     #endif
     
     bool TryGetImageFromClipboard(wxBitmap& bitmap);

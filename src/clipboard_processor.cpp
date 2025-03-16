@@ -269,23 +269,24 @@ bool ClipboardProcessor::ProcessImageFormat()
     
     #ifdef __WXMAC__
     // Try Mac-specific formats if standard bitmap format didn't work
-    wxLogDebug("000000000000000000000000");
     if (!gotImage) {
         if (HasFormatName("public.png") || HasFormatName("PNG") || HasFormatName("image/png")) {
-            gotImage = ProcessPngFormat();
-            // return gotImage; // Mac format handlers call the callback directly
+            wxBitmap macImage;
+            if (GetPngImage(macImage)) {
+                newImage = macImage;
+                gotImage = true;
+            }
         }
         
-        if (HasFormatName("public.tiff")) {
-            gotImage = ProcessTiffFormat();
-            // return gotImage; // Mac format handlers call the callback directly
+        if (!gotImage && HasFormatName("public.tiff")) {
+            wxBitmap macImage;
+            if (GetTiffImage(macImage)) {
+                newImage = macImage;
+                gotImage = true;
+            }
         }
     }
     #endif
-    wxLogDebug("999999999999999999999999");
-    // Log the status of image retrieval
-    wxLogDebug("Image retrieval status: gotImage=%d, newImage.IsOk()=%d", 
-              gotImage, newImage.IsOk());
     
     // If we successfully got an image, check if it's new and process it
     if (gotImage && newImage.IsOk()) {
@@ -294,14 +295,11 @@ bool ClipboardProcessor::ProcessImageFormat()
         
         // Check if this is a new image
         bool isNewImage = false;
-        wxLogDebug("111111111111111111111111");
         
         if (!m_clipboardData || !m_clipboardData->hasImage) {
             isNewImage = true;
-            wxLogDebug("222222222222222222222222");
         } else {
             // Always treat as new image if dimensions changed
-            wxLogDebug("333333333333333333333333");
             if (m_clipboardData->imageContent.GetWidth() != newImage.GetWidth() ||
                 m_clipboardData->imageContent.GetHeight() != newImage.GetHeight()) {
                 isNewImage = true;
@@ -376,7 +374,7 @@ wxBitmap ClipboardProcessor::GetClipboardImage()
 }
 
 #ifdef __WXMAC__
-bool ClipboardProcessor::ProcessPngFormat()
+bool ClipboardProcessor::GetPngImage(wxBitmap& bitmap)
 {
     wxLogDebug("Attempting to get macOS PNG image from clipboard");
     
@@ -399,15 +397,38 @@ bool ClipboardProcessor::ProcessPngFormat()
     // Try multiple approaches to convert the PNG data
     
     // 1. Try memory stream approach
-    if (TryImageFromMemoryStream(dataObj.GetData(), dataObj.GetSize())) {
-        return true;
+    wxMemoryInputStream memStream(dataObj.GetData(), dataObj.GetSize());
+    wxImage image;
+    if (image.LoadFile(memStream)) {
+        bitmap = wxBitmap(image);
+        return bitmap.IsOk();
     }
     
     // 2. Try temporary file approach
-    return TryImageFromTempFile(dataObj.GetData(), dataObj.GetSize(), "png");
+    // Save the data to a temporary file
+    wxString tempFilePath = wxFileName::GetTempDir() + wxFILE_SEP_PATH + 
+                           "clipboard_temp.png";
+    wxFile tempFile(tempFilePath, wxFile::write);
+    
+    if (!tempFile.IsOpened()) {
+        wxLogDebug("Failed to create temporary file");
+        return false;
+    }
+    
+    tempFile.Write(dataObj.GetData(), dataObj.GetSize());
+    tempFile.Close();
+    wxLogDebug("Saved image data to temporary file: %s", tempFilePath);
+    
+    // Try to load the image from the file
+    if (image.LoadFile(tempFilePath)) {
+        bitmap = wxBitmap(image);
+        return bitmap.IsOk();
+    }
+    
+    return false;
 }
 
-bool ClipboardProcessor::ProcessTiffFormat()
+bool ClipboardProcessor::GetTiffImage(wxBitmap& bitmap)
 {
     wxLogDebug("Attempting to get macOS TIFF image from clipboard");
     
@@ -427,47 +448,17 @@ bool ClipboardProcessor::ProcessTiffFormat()
                dataObj.GetSize());
     
     // 1. Try memory stream approach
-    if (TryImageFromMemoryStream(dataObj.GetData(), dataObj.GetSize(), wxBITMAP_TYPE_TIFF)) {
-        return true;
+    wxMemoryInputStream memStream(dataObj.GetData(), dataObj.GetSize());
+    wxImage image;
+    if (image.LoadFile(memStream, wxBITMAP_TYPE_TIFF)) {
+        bitmap = wxBitmap(image);
+        return bitmap.IsOk();
     }
     
     // 2. Try temporary file approach
-    return TryImageFromTempFile(dataObj.GetData(), dataObj.GetSize(), "tiff");
-}
-
-bool ClipboardProcessor::TryImageFromMemoryStream(const void* data, size_t len, wxBitmapType type)
-{
-    wxMemoryInputStream memStream(data, len);
-    wxImage image;
-    
-    bool success = false;
-    if (type == wxBITMAP_TYPE_ANY) {
-        success = image.LoadFile(memStream);
-    } else {
-        success = image.LoadFile(memStream, type);
-    }
-    
-    if (success) {
-        wxBitmap bitmap(image);
-        wxLogDebug("Successfully converted image data to bitmap using memory stream: %d x %d", 
-                  bitmap.GetWidth(), bitmap.GetHeight());
-        
-        if (m_imageCallback && bitmap.IsOk()) {
-            m_imageCallback(bitmap, wxDateTime::Now());
-            return true;
-        }
-    } else {
-        wxLogDebug("Failed to convert image data using memory stream");
-    }
-    
-    return false;
-}
-
-bool ClipboardProcessor::TryImageFromTempFile(const void* data, size_t len, const wxString& extension)
-{
     // Save the data to a temporary file
     wxString tempFilePath = wxFileName::GetTempDir() + wxFILE_SEP_PATH + 
-                           "clipboard_temp." + extension;
+                           "clipboard_temp.tiff";
     wxFile tempFile(tempFilePath, wxFile::write);
     
     if (!tempFile.IsOpened()) {
@@ -475,23 +466,14 @@ bool ClipboardProcessor::TryImageFromTempFile(const void* data, size_t len, cons
         return false;
     }
     
-    tempFile.Write(data, len);
+    tempFile.Write(dataObj.GetData(), dataObj.GetSize());
     tempFile.Close();
     wxLogDebug("Saved image data to temporary file: %s", tempFilePath);
     
     // Try to load the image from the file
-    wxImage image;
-    if (image.LoadFile(tempFilePath)) {
-        wxBitmap bitmap(image);
-        wxLogDebug("Successfully loaded image from file: %d x %d", 
-                  bitmap.GetWidth(), bitmap.GetHeight());
-        
-        if (m_imageCallback && bitmap.IsOk()) {
-            m_imageCallback(bitmap, wxDateTime::Now());
-            return true;
-        }
-    } else {
-        wxLogDebug("Failed to load image from file");
+    if (image.LoadFile(tempFilePath, wxBITMAP_TYPE_TIFF)) {
+        bitmap = wxBitmap(image);
+        return bitmap.IsOk();
     }
     
     return false;
