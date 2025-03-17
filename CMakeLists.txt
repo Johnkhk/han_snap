@@ -58,6 +58,10 @@ elseif(UNIX AND NOT APPLE)
     include_directories(${X11_INCLUDE_DIR} ${GTK3_INCLUDE_DIRS})
 endif()
 
+# Find libcurl
+find_package(CURL REQUIRED)
+include_directories(${CURL_INCLUDE_DIRS})
+
 # Add the source files
 add_executable(han_snap_app 
     src/main.cpp
@@ -68,6 +72,7 @@ add_executable(han_snap_app
     src/clipboard_processor.cpp
     src/taskbar.cpp
     src/ocr.cpp
+    src/http_client.cpp
 )
 
 target_link_libraries(han_snap_app PRIVATE 
@@ -75,6 +80,7 @@ target_link_libraries(han_snap_app PRIVATE
     ${EXTRA_LIBS}
     ${TESSERACT_LIBRARY}
     ${LEPTONICA_LIBRARY}
+    ${CURL_LIBRARIES}
 )
 
 # Add the examples

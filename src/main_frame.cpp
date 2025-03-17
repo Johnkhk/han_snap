@@ -1,5 +1,6 @@
 #include "../include/main_frame.h"
 #include "../include/ocr.h"
+#include "../include/http_client.h"
 
 MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor", wxDefaultPosition, wxSize(800, 600)),
@@ -170,14 +171,14 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     m_imageDisplay->SetBitmap(image);
     m_imageDisplay->Show();
     
-    // Perform OCR on the image
-    if (!OcrEngine::IsInitialized()) {
-        if (!OcrEngine::Initialize("chi_sim")) {
-            wxLogError("Failed to initialize OCR engine for Simplified Chinese");
-        } else {
-            wxLogMessage("OCR engine initialized for Simplified Chinese");
-        }
-    }
+    // // Perform OCR on the image
+    // if (!OcrEngine::IsInitialized()) {
+    //     if (!OcrEngine::Initialize("chi_sim")) {
+    //         wxLogError("Failed to initialize OCR engine for Simplified Chinese");
+    //     } else {
+    //         wxLogMessage("OCR engine initialized for Simplified Chinese");
+    //     }
+    // }
     
     if (OcrEngine::IsInitialized()) {
         wxString recognizedText = OcrEngine::ExtractTextFromBitmap(image);
@@ -186,4 +187,8 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     
     // Update layout
     Layout();
+
+    wxString response = HttpClient::GetFromLocalhost("/hello", 8080);
+    std::cout << "Response: " << response << std::endl;
 } 
+

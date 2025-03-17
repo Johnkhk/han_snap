@@ -99,7 +99,8 @@ std::string extractJSONContent(const std::string& rawResponse) {
             
             // Validate that the content is valid JSON
             try {
-                json::parse(content);
+                json parsed = json::parse(content);
+                (void)parsed; // Avoid unused variable warning
                 return content;
             } catch (const json::parse_error& e) {
                 return "{ \"error\": \"Invalid JSON in response content: " + std::string(e.what()) + "\" }";
@@ -123,13 +124,12 @@ struct Translation {
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(Translation, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese)
 };
 
-// Get a structured response directly into a C++ struct
+// Fix template implementation before specialization
 template<typename T>
 T getStructuredResponse(const std::string& prompt) {
     // Create a schema description from the struct's fields
     std::string schema = "{";
     // For simplicity we're just assuming string fields here
-    // In a real implementation, you might want to reflect on T's structure
     schema += "\"meaning_english\": \"string\", ";
     schema += "\"pinyin_mandarin\": \"string\", ";
     schema += "\"jyutping_cantonese\": \"string\", ";
@@ -151,27 +151,5 @@ T getStructuredResponse(const std::string& prompt) {
     }
 }
 
-
-int main() {
-    // Initialize libcurl
-    curl_global_init(CURL_GLOBAL_ALL);
-    
-    // Example 4: Using a struct for structured data
-    std::string chinese_word = "你好";
-    std::string struct_prompt = "Provide translation information for the Chinese word '" + 
-                                chinese_word + "'. Include English meaning, Mandarin pinyin, " +
-                                "Cantonese jyutping, and equivalent Cantonese expression.";
-    
-    Translation translation = getStructuredResponse<Translation>(struct_prompt);
-    
-    // Display the structured result
-    std::cout << "\nStructured Translation Response:" << std::endl;
-    std::cout << "English meaning: " << translation.meaning_english << std::endl;
-    std::cout << "Mandarin pinyin: " << translation.pinyin_mandarin << std::endl;
-    std::cout << "Cantonese jyutping: " << translation.jyutping_cantonese << std::endl;
-    std::cout << "Cantonese equivalent: " << translation.equivalent_cantonese << std::endl;
-    
-    // Clean up libcurl
-    curl_global_cleanup();
-    return 0;
-}
+// Then declare the explicit instantiation
+template Translation getStructuredResponse<Translation>(const std::string& prompt);
