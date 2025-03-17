@@ -15,9 +15,14 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
     return total_size;
 }
 
-
-// Call ChatGPT and request structured JSON output
-std::string callChatGPTForJSON(const std::string& prompt, const std::string& responseSchema) {
+/**
+ * Call ChatGPT API with a prompt and expected schema to get a JSON response
+ * 
+ * @param prompt The text prompt to send to ChatGPT
+ * @param schemaJson The expected JSON schema for the response (can be empty json object)
+ * @return Raw response from the API
+ */
+std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson = json()) {
     // Get API key from environment variable
     const char* api_key = std::getenv("LLM_API_KEY");
     if (!api_key) {
@@ -30,29 +35,44 @@ std::string callChatGPTForJSON(const std::string& prompt, const std::string& res
     
     if (curl) {
         std::string url = "https://api.openai.com/v1/chat/completions";
+        std::cout << "Calling ChatGPT API..." << std::endl;
         
         // Create JSON payload using nlohmann/json
         json payload = {
-            {"model", "gpt-4-turbo"},
+            {"model", "gpt-4o"},
             {"messages", json::array({
                 {
                     {"role", "system"},
-                    {"content", "You are a helpful assistant that always responds in JSON format. " + 
-                               (responseSchema.empty() ? "Use appropriate JSON structure for the response." : 
-                                                      "Follow this schema: " + responseSchema)}
+                    {"content", "You are an expert translator. You are given a text and you need to translate it into English. You will respond in JSON format with fields: meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese."}
                 },
                 {
                     {"role", "user"},
                     {"content", prompt}
                 }
-            })},
-            {"response_format", {{"type", "json_object"}}},
-            {"max_tokens", 500}
+            })}
         };
         
-        // Convert to string - the library handles all escaping automatically
-        std::string json_payload = payload.dump();
+        // Add response_format section
+        if (schemaJson.empty()) {
+            // Basic JSON mode - just return JSON
+            payload["response_format"] = {{"type", "json_object"}};
+        } else {
+            // Use the provided JSON object directly
+            payload["response_format"] = {
+                {"type", "json_schema"},
+                {"json_schema", {
+                    {"name", "translation_schema"},
+                    {"strict", true},
+                    {"schema", schemaJson}  // Use the JSON object directly
+                }}
+            };
+        }
         
+        // Convert to string
+        std::string json_payload = payload.dump();
+        // std::cout << "Request payload: " << json_payload << std::endl;
+        
+        // Set up headers
         struct curl_slist* headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
         
@@ -83,6 +103,7 @@ std::string callChatGPTForJSON(const std::string& prompt, const std::string& res
 // Parse JSON response and return just the JSON content (not the OpenAI wrapper)
 std::string extractJSONContent(const std::string& rawResponse) {
     try {
+        std::cout << "Raw API response: " << rawResponse << std::endl;
         json response = json::parse(rawResponse);
         
         // Check if there's an error
@@ -112,44 +133,3 @@ std::string extractJSONContent(const std::string& rawResponse) {
         return "{ \"error\": \"Error parsing response: " + std::string(e.what()) + "\" }";
     }
 }
-
-// Define the Translation struct
-struct Translation {
-    std::string meaning_english;
-    std::string pinyin_mandarin;
-    std::string jyutping_cantonese;
-    std::string equivalent_cantonese;
-
-    // Enable JSON serialization and deserialization
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(Translation, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese)
-};
-
-// Fix template implementation before specialization
-template<typename T>
-T getStructuredResponse(const std::string& prompt) {
-    // Create a schema description from the struct's fields
-    std::string schema = "{";
-    // For simplicity we're just assuming string fields here
-    schema += "\"meaning_english\": \"string\", ";
-    schema += "\"pinyin_mandarin\": \"string\", ";
-    schema += "\"jyutping_cantonese\": \"string\", ";
-    schema += "\"equivalent_cantonese\": \"string\"";
-    schema += "}";
-    
-    // Call the API with the schema
-    std::string json_response = callChatGPTForJSON(prompt, schema);
-    
-    // Extract just the content part
-    std::string json_content = extractJSONContent(json_response);
-    
-    // Parse into the struct
-    try {
-        return json::parse(json_content).get<T>();
-    } catch (const std::exception& e) {
-        std::cerr << "Error deserializing response: " << e.what() << std::endl;
-        return T(); // Return default-constructed object
-    }
-}
-
-// Then declare the explicit instantiation
-template Translation getStructuredResponse<Translation>(const std::string& prompt);

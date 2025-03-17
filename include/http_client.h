@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <wx/string.h>
 
 /**
@@ -9,21 +8,21 @@
 class HttpClient {
 public:
     /**
-     * Sends a GET request to localhost at the specified endpoint
+     * Sends a GET request to a URL
      * 
-     * @param endpoint The endpoint path (e.g., "/api/data")
-     * @param port The port number (default: 8080)
-     * @return Response text or error message
-     */
-    static wxString GetFromLocalhost(const wxString& endpoint, int port = 8080);
-    
-    /**
-     * Sends a GET request to a fully specified URL
-     * 
-     * @param url The complete URL to send request to
+     * @param url The complete URL to send request to (e.g., "http://localhost:8080/api/data")
      * @return Response text or error message
      */
     static wxString Get(const wxString& url);
+    
+    /**
+     * Sends a POST request with JSON data
+     * 
+     * @param url The complete URL to send request to
+     * @param jsonData The JSON data to send in the request body
+     * @return Response text or error message
+     */
+    static wxString Post(const wxString& url, const wxString& jsonData);
     
 private:
     // Helper function used to accumulate response data

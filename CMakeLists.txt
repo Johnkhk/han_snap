@@ -62,6 +62,9 @@ endif()
 find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
 
+# Find nlohmann_json
+find_package(nlohmann_json REQUIRED)
+
 # Add the source files
 add_executable(han_snap_app 
     src/main.cpp
@@ -81,6 +84,7 @@ target_link_libraries(han_snap_app PRIVATE
     ${TESSERACT_LIBRARY}
     ${LEPTONICA_LIBRARY}
     ${CURL_LIBRARIES}
+    nlohmann_json::nlohmann_json
 )
 
 # Add the examples

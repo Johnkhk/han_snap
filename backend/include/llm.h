@@ -2,6 +2,7 @@
 
 #include <string>
 #include <nlohmann/json.hpp>
+#include "model.h"  // Include model header for struct definitions
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
@@ -15,10 +16,10 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
  * Call ChatGPT API with a prompt and expected schema to get a JSON response
  * 
  * @param prompt The text prompt to send to ChatGPT
- * @param responseSchema The expected JSON schema for the response
+ * @param schemaJson The expected JSON schema for the response (can be empty json object)
  * @return Raw response from the API
  */
-std::string callChatGPTForJSON(const std::string& prompt, const std::string& responseSchema);
+std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson = json());
 
 /**
  * Extract the actual JSON content from the OpenAI API response
@@ -29,23 +30,26 @@ std::string callChatGPTForJSON(const std::string& prompt, const std::string& res
 std::string extractJSONContent(const std::string& rawResponse);
 
 /**
- * Translation data structure
- */
-struct Translation {
-    std::string meaning_english;
-    std::string pinyin_mandarin;
-    std::string jyutping_cantonese;
-    std::string equivalent_cantonese;
-
-    // Enable JSON serialization and deserialization
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(Translation, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese)
-};
-
-/**
- * Get a structured response directly into a C++ struct
+ * Get a structured response directly into a C++ struct or any type that can be
+ * deserialized from JSON using nlohmann_json.
  * 
  * @param prompt The text prompt to send to ChatGPT
  * @return A structured object of type T containing the response
  */
 template<typename T>
-T getStructuredResponse(const std::string& prompt); 
+T getStructuredResponse(const std::string& prompt) {
+    // Generate a simple description of what we need
+    std::cout << "Prompt: " << prompt << std::endl;
+    json schema = T::responseSchema();
+    std::string json_response = callChatGPTForJSON(prompt, schema); 
+    // Extract just the content part
+    std::string json_content = extractJSONContent(json_response);
+    
+    // Parse into the type
+    try {
+        return json::parse(json_content).get<T>();
+    } catch (const std::exception& e) {
+        std::cerr << "Error deserializing response: " << e.what() << std::endl;
+        return T(); // Return default-constructed object
+    }
+}

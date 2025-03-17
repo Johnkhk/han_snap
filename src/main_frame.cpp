@@ -1,6 +1,24 @@
 #include "../include/main_frame.h"
 #include "../include/ocr.h"
 #include "../include/http_client.h"
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+json GetLLMResponse(const wxString& text) {
+
+    // Escape any special characters in the recognized text
+    wxString escapedText = text;
+    escapedText.Replace("\\", "\\\\");
+    escapedText.Replace("\"", "\\\"");
+    escapedText.Replace("\n", "\\n");
+    escapedText.Replace("\r", "\\r");
+    escapedText.Replace("\t", "\\t");
+    
+    wxString jsonStr = "{\"text\": \"" + escapedText + "\"}";
+    wxString response = HttpClient::Post("http://localhost:8080/llm", jsonStr);
+    
+    return json::parse(response);
+}
 
 MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, "Clipboard Monitor", wxDefaultPosition, wxSize(800, 600)),
@@ -141,17 +159,20 @@ void MainFrame::OnClose(wxCloseEvent& event)
 
 void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestamp)
 {
-    // Update the timestamp display
-    wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
-    m_timestampDisplay->SetLabel("Text copied at: " + timeStr);
+    // // Update the timestamp display
+    // wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
+    // m_timestampDisplay->SetLabel("Text copied at: " + timeStr);
     
-    // Update text display
-    m_textDisplay->SetValue(text);
-    m_textDisplay->Show();
+    // // Update text display
+    // m_textDisplay->SetValue(text);
+    // m_textDisplay->Show();
     
-    // Hide image display
-    m_imageDisplay->SetBitmap(wxNullBitmap);
-    m_imageDisplay->Hide();
+    // // Hide image display
+    // m_imageDisplay->SetBitmap(wxNullBitmap);
+    // m_imageDisplay->Hide();
+
+    json response = GetLLMResponse(text);
+    std::cout << "Response: " << response << std::endl;
     
     // Update layout
     Layout();
@@ -159,36 +180,30 @@ void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestam
 
 void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timestamp)
 {
-    // Update the timestamp display
-    wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
-    m_timestampDisplay->SetLabel("Image copied at: " + timeStr);
+    // // Update the timestamp display
+    // wxString timeStr = timestamp.Format("%Y-%m-%d %H:%M:%S");
+    // m_timestampDisplay->SetLabel("Image copied at: " + timeStr);
     
-    // Hide text display
-    m_textDisplay->Clear();
-    m_textDisplay->Hide();
+    // // Hide text display
+    // m_textDisplay->Clear();
+    // m_textDisplay->Hide();
     
-    // Update image display
-    m_imageDisplay->SetBitmap(image);
-    m_imageDisplay->Show();
+    // // Update image display
+    // m_imageDisplay->SetBitmap(image);
+    // m_imageDisplay->Show();
     
-    // // Perform OCR on the image
-    // if (!OcrEngine::IsInitialized()) {
-    //     if (!OcrEngine::Initialize("chi_sim")) {
-    //         wxLogError("Failed to initialize OCR engine for Simplified Chinese");
-    //     } else {
-    //         wxLogMessage("OCR engine initialized for Simplified Chinese");
-    //     }
-    // }
-    
+    // Perform OCR on the image
     if (OcrEngine::IsInitialized()) {
         wxString recognizedText = OcrEngine::ExtractTextFromBitmap(image);
-        wxLogDebug("OCR Text: %s", recognizedText);
+        // wxLogDebug("OCR Text: %s", recognizedText);
+        // std::cout << "OCR Text: " << recognizedText << std::endl;
+
+        json response = GetLLMResponse(recognizedText);
+        std::cout << "Response: " << response << std::endl;
+        // TODO: Update the text display with the LLM response
     }
     
     // Update layout
     Layout();
 
-    wxString response = HttpClient::GetFromLocalhost("/hello", 8080);
-    std::cout << "Response: " << response << std::endl;
 } 
-

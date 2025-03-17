@@ -47,14 +47,13 @@ int main() {
                 }
                 
                 // Extract fields from the request
-                std::string prompt;
-                std::string schema = "{}";  // Default empty schema
+                std::string text;
                 
-                if (reqJson.contains("prompt")) {
-                    prompt = reqJson["prompt"].get<std::string>();
+                if (reqJson.contains("text")) {
+                    text = reqJson["text"].get<std::string>();
                 } else {
                     json errorJson = {
-                        {"error", "Missing 'prompt' field"}
+                        {"error", "Missing 'text' field"}
                     };
                     resp->setStatusCode(drogon::k400BadRequest);
                     resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
@@ -63,17 +62,29 @@ int main() {
                     return;
                 }
                 
-                if (reqJson.contains("schema")) {
-                    schema = reqJson["schema"].get<std::string>();
-                }
                 
-                // Call the GPT API
-                std::string rawResponse = callChatGPTForJSON(prompt, schema);
-                std::string jsonContent = extractJSONContent(rawResponse);
-                
-                // Set the raw JSON string as the response body
+                // Create a more detailed prompt for translation
+                // TODO: Use a prompt file and load it
+                std::string prompt = "Translate the Chinese text '" + text + "' to English. Include:\n"
+                                    "- English meaning\n"
+                                    "- Mandarin pronunciation (pinyin)\n"
+                                    "- Cantonese pronunciation (jyutping)\n"
+                                    "- Cantonese equivalent phrase if different from input";
+
+                // Call the GPT API using the simplified structured response template
+                Translation translation = getStructuredResponse<Translation>(prompt);
+
+                // Convert Translation to JSON and wrap with original text
+                json responseJson = {
+                    {"translation", json{
+                        {"text", text},           // Add the original text
+                        {"result", translation}   // The translation struct will be converted to JSON automatically
+                    }}
+                };
+
+                // Set the JSON response
                 resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);
-                resp->setBody(jsonContent);
+                resp->setBody(responseJson.dump());
                 callback(resp);
                 
             } catch (const std::exception& e) {
