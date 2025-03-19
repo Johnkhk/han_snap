@@ -350,6 +350,7 @@ void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestam
     json response = GetLLMResponse(text);
     std::cout << "Response: " << response << std::endl;
     UpdateUIWithTranslation(response);
+    RequestUserAttention(wxUSER_ATTENTION_INFO);
 }
 
 void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timestamp)
@@ -366,6 +367,7 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
             json response = GetLLMResponse(recognizedText);
             std::cout << "Response: " << response << std::endl;
             UpdateUIWithTranslation(response);
+            RequestUserAttention(wxUSER_ATTENTION_INFO);
         } else {
             // No text recognized
             ShowWaitingMessage();
