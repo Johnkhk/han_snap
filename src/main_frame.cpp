@@ -187,6 +187,7 @@ MainFrame::MainFrame()
     
     // Bind events
     Bind(wxEVT_CLOSE_WINDOW, &MainFrame::OnClose, this);
+    Bind(wxEVT_COMMAND_MENU_SELECTED, &MainFrame::OnToggleApp, this, MyTaskBarIcon::ID_TOGGLE_APP);
     
     // Initialize clipboard processor with callbacks that include timestamps
     m_clipboardProcessor = std::make_unique<ClipboardProcessor>();
@@ -315,15 +316,20 @@ void MainFrame::OnToggleApp(wxCommandEvent& event)
     
     if (isEnabled) {
         // We're turning the app back on
-        // Update 
+        // Update timestamp to prevent processing old clipboard content
         m_lastProcessedTimestamp = wxDateTime::Now();
         
         // Start clipboard monitoring
         m_clipboardProcessor->Start();
         
-        // Show the window
+        // Show the window, bring to front, and focus
         Show();
         Raise();
+        RequestUserAttention(wxUSER_ATTENTION_INFO);
+        SetFocus();
+        
+        // Update status
+        SetStatusText("Clipboard monitoring active");
     } else {
         // We're turning the app off
         // Stop clipboard monitoring

@@ -21,9 +21,18 @@ MyTaskBarIcon::~MyTaskBarIcon()
 wxMenu* MyTaskBarIcon::CreatePopupMenu()
 {
     wxMenu* menu = new wxMenu;
-    menu->Append(ID_TOGGLE_APP, wxString::Format("App: %s", m_appEnabled ? "On" : "Off"));
+    
+    // Create a more visual toggle item with colored indicator
+    wxString statusText;
+    if (m_appEnabled) {
+        statusText = "●  App: Active";  // Green dot (displayed as ● in the menu)
+    } else {
+        statusText = "○  App: Disabled";  // Empty circle (displayed as ○ in the menu)
+    }
+    
+    menu->Append(ID_TOGGLE_APP, statusText);
     menu->AppendSeparator();
-    menu->Append(ID_SHOW_HIDE, m_parentFrame->IsShown() ? "Hide" : "Show");
+    menu->Append(ID_SHOW_HIDE, m_parentFrame->IsShown() ? "Hide Window" : "Show Window");
     menu->AppendSeparator();
     menu->Append(wxID_EXIT, "Quit");
     
@@ -49,17 +58,32 @@ void MyTaskBarIcon::OnToggleApp(wxCommandEvent& event)
 {
     m_appEnabled = !m_appEnabled;
     
-    // You can add code here to actually enable/disable app functionality
-    // For example, start/stop monitoring clipboard, etc.
-    
-    // Example of how you might notify the main frame about the state change:
+    // Notify the main frame about the state change
     wxCommandEvent toggleEvent(wxEVT_COMMAND_MENU_SELECTED, ID_TOGGLE_APP);
     toggleEvent.SetInt(m_appEnabled ? 1 : 0);
     wxPostEvent(m_parentFrame, toggleEvent);
+    
+    // Update the icon's tooltip to reflect the current state
+    if (IsIconInstalled()) {
+        // Reload the icon and update the tooltip with clearer status
+        wxIcon icon;
+        if (icon.LoadFile("../assets/images/app_icon.png", wxBITMAP_TYPE_PNG)) {
+            SetIcon(icon, wxString::Format("HanSnap - %s", 
+                m_appEnabled ? "● Active (Monitoring)" : "○ Disabled (Not Monitoring)"));
+        }
+    }
 }
 
 void MyTaskBarIcon::OnQuit(wxCommandEvent& event)
 {
+    // Ensure app is fully disabled before quitting
+    if (m_appEnabled) {
+        m_appEnabled = false;
+        wxCommandEvent toggleEvent(wxEVT_COMMAND_MENU_SELECTED, ID_TOGGLE_APP);
+        toggleEvent.SetInt(0);  // 0 = disabled
+        wxPostEvent(m_parentFrame, toggleEvent);
+    }
+    
     m_parentFrame->Close(true);
 }
 
