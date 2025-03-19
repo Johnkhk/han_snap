@@ -24,107 +24,161 @@ MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, "HanSnap - Chinese Translation", wxDefaultPosition, wxSize(800, 600)),
       m_lastProcessedTimestamp(wxDateTime::Now())  // Initialize with current time
 {
-    // Create main panel
+    // Set up status bar
+    CreateStatusBar();
+    SetStatusText("Waiting for clipboard content...");
+    
+    // Create main panel with light blue-gray background for better contrast
     m_mainPanel = new wxPanel(this);
+    m_mainPanel->SetBackgroundColour(wxColour(240, 245, 250));
     wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
     
-    // Create waiting message (initially visible)
-    m_waitingMessage = new wxStaticText(m_mainPanel, wxID_ANY, "Waiting for Clipboard Content...", 
-                                        wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+    // Create waiting message panel (initially visible)
+    m_waitingPanel = new wxPanel(m_mainPanel);
+    wxBoxSizer* waitingSizer = new wxBoxSizer(wxVERTICAL);
+    
+    // Simple version without the icon for now
+    m_waitingMessage = new wxStaticText(m_waitingPanel, wxID_ANY, "Waiting for Clipboard Content...", 
+                                      wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
     wxFont waitingFont = m_waitingMessage->GetFont();
     waitingFont.SetPointSize(waitingFont.GetPointSize() + 4);
     waitingFont.SetWeight(wxFONTWEIGHT_BOLD);
     m_waitingMessage->SetFont(waitingFont);
-    mainSizer->Add(m_waitingMessage, 1, wxALIGN_CENTER | wxALL, 20);
+    m_waitingMessage->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
     
-    // Create translation UI elements (initially hidden)
+    waitingSizer->Add(m_waitingMessage, 0, wxALIGN_CENTER | wxALL, 20);
     
-    // English meaning (top section)
-    wxBoxSizer* englishSizer = new wxBoxSizer(wxVERTICAL);
-    m_englishMeaningLabel = new wxStaticText(m_mainPanel, wxID_ANY, "English Meaning:");
-    wxFont labelFont = m_englishMeaningLabel->GetFont();
+    // Add a helpful instruction message
+    wxStaticText* instructionText = new wxStaticText(m_waitingPanel, wxID_ANY, 
+        "Copy Chinese text or an image containing Chinese text to translate it automatically.",
+        wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+    instructionText->SetForegroundColour(wxColour(50, 50, 100));  // Dark blue-gray text
+    waitingSizer->Add(instructionText, 0, wxALIGN_CENTER | wxALL, 10);
+    
+    m_waitingPanel->SetSizer(waitingSizer);
+    mainSizer->Add(m_waitingPanel, 1, wxEXPAND | wxALL, 5);
+    
+    // Create translation panel (initially hidden)
+    m_translationPanel = new wxPanel(m_mainPanel);
+    wxBoxSizer* translationSizer = new wxBoxSizer(wxVERTICAL);
+    
+    // English meaning (top section) with styled border
+    wxStaticBoxSizer* englishBox = new wxStaticBoxSizer(wxVERTICAL, m_translationPanel, "");
+    wxFont boxFont = englishBox->GetStaticBox()->GetFont();
+    boxFont.SetWeight(wxFONTWEIGHT_BOLD);
+    englishBox->GetStaticBox()->SetFont(boxFont);
+    
+    // Add "Meaning" label
+    wxStaticText* meaningLabel = new wxStaticText(englishBox->GetStaticBox(), wxID_ANY, "Meaning");
+    wxFont labelFont = meaningLabel->GetFont();
+    labelFont.SetPointSize(labelFont.GetPointSize() + 1);
     labelFont.SetWeight(wxFONTWEIGHT_BOLD);
-    m_englishMeaningLabel->SetFont(labelFont);
+    meaningLabel->SetFont(labelFont);
+    meaningLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
     
-    m_englishMeaningText = new wxTextCtrl(m_mainPanel, wxID_ANY, "", 
+    englishBox->Add(meaningLabel, 0, wxEXPAND | wxALL, 5);
+    
+    m_englishMeaningText = new wxTextCtrl(englishBox->GetStaticBox(), wxID_ANY, "", 
                                          wxDefaultPosition, wxDefaultSize,
                                          wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
     wxFont englishFont = m_englishMeaningText->GetFont();
     englishFont.SetPointSize(englishFont.GetPointSize() + 2);
     m_englishMeaningText->SetFont(englishFont);
+    m_englishMeaningText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
+    m_englishMeaningText->SetBackgroundColour(wxColour(250, 250, 255));  // Very light blue background
     
-    englishSizer->Add(m_englishMeaningLabel, 0, wxEXPAND | wxALL, 5);
-    englishSizer->Add(m_englishMeaningText, 1, wxEXPAND | wxALL, 5);
+    englishBox->Add(m_englishMeaningText, 1, wxEXPAND | wxALL, 5);
     
     // Create horizontal sizer for the two-panel layout
     wxBoxSizer* horizontalSizer = new wxBoxSizer(wxHORIZONTAL);
     
     // Left panel (Original text with Pinyin)
-    m_leftPanel = new wxPanel(m_mainPanel);
-    wxBoxSizer* leftSizer = new wxBoxSizer(wxVERTICAL);
+    wxStaticBoxSizer* leftBox = new wxStaticBoxSizer(wxVERTICAL, m_translationPanel, "");
+    leftBox->GetStaticBox()->SetFont(boxFont);
     
-    m_pinyinLabel = new wxStaticText(m_leftPanel, wxID_ANY, "Mandarin Pinyin:");
-    m_pinyinLabel->SetFont(labelFont);
-    m_pinyinText = new wxTextCtrl(m_leftPanel, wxID_ANY, "", 
+    // Add "Mandarin" label
+    wxStaticText* mandarinLabel = new wxStaticText(leftBox->GetStaticBox(), wxID_ANY, "Mandarin");
+    mandarinLabel->SetFont(labelFont);
+    mandarinLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
+    leftBox->Add(mandarinLabel, 0, wxEXPAND | wxALL, 5);
+    
+    // Create pinyin text control
+    m_pinyinText = new wxTextCtrl(leftBox->GetStaticBox(), wxID_ANY, "", 
                                  wxDefaultPosition, wxDefaultSize,
                                  wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+    m_pinyinText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
+    m_pinyinText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
+    wxFont pinyinFont = m_pinyinText->GetFont();
+    pinyinFont.SetPointSize(pinyinFont.GetPointSize() + 1);
+    m_pinyinText->SetFont(pinyinFont);
     
-    m_originalTextLabel = new wxStaticText(m_leftPanel, wxID_ANY, "Original Text:");
-    m_originalTextLabel->SetFont(labelFont);
-    m_originalText = new wxTextCtrl(m_leftPanel, wxID_ANY, "", 
+    // Create original text control
+    m_originalText = new wxTextCtrl(leftBox->GetStaticBox(), wxID_ANY, "", 
                                    wxDefaultPosition, wxDefaultSize,
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
     wxFont chineseFont = m_originalText->GetFont();
     chineseFont.SetPointSize(chineseFont.GetPointSize() + 4);
     m_originalText->SetFont(chineseFont);
+    m_originalText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
+    m_originalText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     
-    leftSizer->Add(m_pinyinLabel, 0, wxEXPAND | wxALL, 5);
-    leftSizer->Add(m_pinyinText, 1, wxEXPAND | wxALL, 5);
-    leftSizer->Add(m_originalTextLabel, 0, wxEXPAND | wxALL, 5);
-    leftSizer->Add(m_originalText, 2, wxEXPAND | wxALL, 5);
-    m_leftPanel->SetSizer(leftSizer);
+    // Add controls to left box (pinyin directly above original text)
+    leftBox->Add(m_pinyinText, 1, wxEXPAND | wxALL, 5);
+    leftBox->Add(new wxStaticText(leftBox->GetStaticBox(), wxID_ANY, "Chinese:"), 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
+    leftBox->Add(m_originalText, 2, wxEXPAND | wxALL, 5);
     
     // Right panel (Cantonese with Jyutping)
-    m_rightPanel = new wxPanel(m_mainPanel);
-    wxBoxSizer* rightSizer = new wxBoxSizer(wxVERTICAL);
+    wxStaticBoxSizer* rightBox = new wxStaticBoxSizer(wxVERTICAL, m_translationPanel, "");
+    rightBox->GetStaticBox()->SetFont(boxFont);
     
-    m_jyutpingLabel = new wxStaticText(m_rightPanel, wxID_ANY, "Cantonese Jyutping:");
-    m_jyutpingLabel->SetFont(labelFont);
-    m_jyutpingText = new wxTextCtrl(m_rightPanel, wxID_ANY, "", 
+    // Add "Cantonese" label
+    wxStaticText* cantoneseLabel = new wxStaticText(rightBox->GetStaticBox(), wxID_ANY, "Cantonese");
+    cantoneseLabel->SetFont(labelFont);
+    cantoneseLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
+    rightBox->Add(cantoneseLabel, 0, wxEXPAND | wxALL, 5);
+    
+    // Create jyutping text control
+    m_jyutpingText = new wxTextCtrl(rightBox->GetStaticBox(), wxID_ANY, "", 
                                    wxDefaultPosition, wxDefaultSize,
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+    m_jyutpingText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
+    m_jyutpingText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
+    m_jyutpingText->SetFont(pinyinFont);  // Use same font as pinyin
     
-    m_cantoneseLabel = new wxStaticText(m_rightPanel, wxID_ANY, "Cantonese Equivalent:");
-    m_cantoneseLabel->SetFont(labelFont);
-    m_cantoneseText = new wxTextCtrl(m_rightPanel, wxID_ANY, "", 
+    // Create cantonese text control
+    m_cantoneseText = new wxTextCtrl(rightBox->GetStaticBox(), wxID_ANY, "", 
                                     wxDefaultPosition, wxDefaultSize,
                                     wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+    m_cantoneseText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
+    m_cantoneseText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     m_cantoneseText->SetFont(chineseFont);
     
-    rightSizer->Add(m_jyutpingLabel, 0, wxEXPAND | wxALL, 5);
-    rightSizer->Add(m_jyutpingText, 1, wxEXPAND | wxALL, 5);
-    rightSizer->Add(m_cantoneseLabel, 0, wxEXPAND | wxALL, 5);
-    rightSizer->Add(m_cantoneseText, 2, wxEXPAND | wxALL, 5);
-    m_rightPanel->SetSizer(rightSizer);
+    // Add controls to right box (jyutping directly above cantonese text)
+    rightBox->Add(m_jyutpingText, 1, wxEXPAND | wxALL, 5);
+    rightBox->Add(new wxStaticText(rightBox->GetStaticBox(), wxID_ANY, "Cantonese:"), 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
+    rightBox->Add(m_cantoneseText, 2, wxEXPAND | wxALL, 5);
     
     // Add both panels to the horizontal sizer
-    horizontalSizer->Add(m_leftPanel, 1, wxEXPAND | wxALL, 5);
-    horizontalSizer->Add(m_rightPanel, 1, wxEXPAND | wxALL, 5);
+    horizontalSizer->Add(leftBox, 1, wxEXPAND | wxALL, 5);
+    horizontalSizer->Add(rightBox, 1, wxEXPAND | wxALL, 5);
     
     // Image display for OCR preview (hidden by default)
-    m_imageDisplay = new wxStaticBitmap(m_mainPanel, wxID_ANY, wxNullBitmap);
+    wxStaticBoxSizer* imageBox = new wxStaticBoxSizer(wxVERTICAL, m_translationPanel, "OCR Image");
+    imageBox->GetStaticBox()->SetFont(boxFont);
     
-    // Add components to main sizer
-    mainSizer->Add(englishSizer, 1, wxEXPAND | wxALL, 5);
-    mainSizer->Add(horizontalSizer, 2, wxEXPAND | wxALL, 5);
-    mainSizer->Add(m_imageDisplay, 0, wxEXPAND | wxALL, 5);
+    m_imageDisplay = new wxStaticBitmap(imageBox->GetStaticBox(), wxID_ANY, wxNullBitmap);
+    imageBox->Add(m_imageDisplay, 1, wxALIGN_CENTER | wxALL, 10);
+    
+    // Add components to translation sizer
+    translationSizer->Add(englishBox, 1, wxEXPAND | wxALL, 10);
+    translationSizer->Add(horizontalSizer, 2, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    translationSizer->Add(imageBox, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+    
+    m_translationPanel->SetSizer(translationSizer);
+    mainSizer->Add(m_translationPanel, 1, wxEXPAND);
     
     // Initially hide the translation UI
-    m_englishMeaningLabel->Hide();
-    m_englishMeaningText->Hide();
-    m_leftPanel->Hide();
-    m_rightPanel->Hide();
-    m_imageDisplay->Hide();
+    m_translationPanel->Hide();
     
     m_mainPanel->SetSizer(mainSizer);
     
@@ -191,27 +245,23 @@ MainFrame::~MainFrame()
 void MainFrame::ShowWaitingMessage()
 {
     // Show waiting message and hide translation UI
-    m_waitingMessage->Show();
+    m_waitingPanel->Show();
+    m_translationPanel->Hide();
     
-    m_englishMeaningLabel->Hide();
-    m_englishMeaningText->Hide();
-    m_leftPanel->Hide();
-    m_rightPanel->Hide();
-    m_imageDisplay->Hide();
+    // Update status bar
+    SetStatusText("Waiting for clipboard content...");
     
     m_mainPanel->Layout();
 }
 
 void MainFrame::UpdateUIWithTranslation(const json& response)
 {
-    // Hide waiting message
-    m_waitingMessage->Hide();
+    // Hide waiting message and show translation UI
+    m_waitingPanel->Hide();
+    m_translationPanel->Show();
     
-    // Show translation UI
-    m_englishMeaningLabel->Show();
-    m_englishMeaningText->Show();
-    m_leftPanel->Show();
-    m_rightPanel->Show();
+    // Update status bar
+    SetStatusText("Translation completed");
     
     // Extract data from JSON response
     if (response.contains("translation") && 

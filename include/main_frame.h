@@ -36,8 +36,7 @@ private:
 
     // UI elements
     wxPanel* m_mainPanel;
-    
-    // Initial waiting message
+    wxPanel* m_translationPanel;
     wxStaticText* m_waitingMessage;
     
     // Translation display elements
@@ -67,4 +66,7 @@ private:
     
     // Unique pointer to the ClipboardProcessor instance.
     std::unique_ptr<ClipboardProcessor> m_clipboardProcessor;
+
+    // Add this line to your existing member variables
+    wxPanel* m_waitingPanel;
 }; 
