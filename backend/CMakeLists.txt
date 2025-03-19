@@ -15,8 +15,11 @@ include_directories(${CURL_INCLUDE_DIRS})
 # Find nlohmann_json
 find_package(nlohmann_json REQUIRED)
 
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Include directories - include both backend and main project includes
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include  # This points to the main project's include directory
+)
 
 # Add the source files
 add_executable(drogon_backend 

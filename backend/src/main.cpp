@@ -22,6 +22,7 @@ int main() {
         [](const drogon::HttpRequestPtr& req, 
            std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
             
+            std::cout << "LLM route called" << std::endl;
             // Create a response
             auto resp = drogon::HttpResponse::newHttpResponse();
             

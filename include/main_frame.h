@@ -6,6 +6,7 @@
 #include <memory>
 #include "clipboard_processor.h"
 #include "taskbar.h"
+#include <nlohmann/json.hpp>
 
 // MainFrame class that listens for clipboard events.
 class MainFrame : public wxFrame
@@ -27,10 +28,38 @@ private:
     // Handle window close event
     void OnClose(wxCloseEvent& event);
 
+    // Method to update UI with translation data
+    void UpdateUIWithTranslation(const nlohmann::json& response);
+    
+    // Method to show waiting message
+    void ShowWaitingMessage();
+
     // UI elements
-    wxTextCtrl* m_textDisplay;
+    wxPanel* m_mainPanel;
+    
+    // Initial waiting message
+    wxStaticText* m_waitingMessage;
+    
+    // Translation display elements
+    wxStaticText* m_englishMeaningLabel;
+    wxTextCtrl* m_englishMeaningText;
+    
+    // Left panel elements
+    wxPanel* m_leftPanel;
+    wxStaticText* m_pinyinLabel;
+    wxTextCtrl* m_pinyinText;
+    wxStaticText* m_originalTextLabel;
+    wxTextCtrl* m_originalText;
+    
+    // Right panel elements
+    wxPanel* m_rightPanel;
+    wxStaticText* m_jyutpingLabel;
+    wxTextCtrl* m_jyutpingText;
+    wxStaticText* m_cantoneseLabel;
+    wxTextCtrl* m_cantoneseText;
+    
+    // Image display for OCR
     wxStaticBitmap* m_imageDisplay;
-    wxStaticText* m_timestampDisplay;  // Added to show the timestamp
     MyTaskBarIcon* m_taskBarIcon;
     
     // Timestamp tracking
