@@ -356,8 +356,8 @@ void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestam
 void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timestamp)
 {
     // Show the image preview
-    m_imageDisplay->SetBitmap(image);
-    m_imageDisplay->Show();
+    // m_imageDisplay->SetBitmap(image);
+    // m_imageDisplay->Show();
     
     // Perform OCR on the image
     if (OcrEngine::IsInitialized()) {
