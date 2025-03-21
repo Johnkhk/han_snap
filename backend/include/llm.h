@@ -39,7 +39,7 @@ std::string extractJSONContent(const std::string& rawResponse);
 template<typename T>
 T getStructuredResponse(const std::string& prompt) {
     // Generate a simple description of what we need
-    std::cout << "Prompt: " << prompt << std::endl;
+    // std::cout << "Prompt: " << prompt << std::endl;
     json schema = T::responseSchema();
     std::string json_response = callChatGPTForJSON(prompt, schema); 
     // Extract just the content part

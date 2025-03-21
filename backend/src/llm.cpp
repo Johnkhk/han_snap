@@ -5,6 +5,12 @@
 #include <nlohmann/json.hpp>
 #include <fstream>  // For file handling
 #include <sstream>  // For string stream
+#include <vector>
+#include <cstring>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/lexical_cast.hpp>
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
@@ -14,6 +20,9 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
     output->append((char*)contents, total_size);
     return total_size;
 }
+
+json generateAudioLinks(const json& jsonResponse);
+std::string generateSpeech(const std::string& text, const std::string& voice);
 
 /**
  * Call ChatGPT API with a prompt and expected schema to get a JSON response
@@ -122,8 +131,8 @@ std::string extractJSONContent(const std::string& rawResponse) {
             // Validate that the content is valid JSON
             try {
                 json parsed = json::parse(content);
-                (void)parsed; // Avoid unused variable warning
-                return content;
+                parsed = generateAudioLinks(parsed);  // Add audio links to the JSON
+                return parsed.dump();
             } catch (const json::parse_error& e) {
                 return "{ \"error\": \"Invalid JSON in response content: " + std::string(e.what()) + "\" }";
             }
@@ -133,4 +142,144 @@ std::string extractJSONContent(const std::string& rawResponse) {
     } catch (const std::exception& e) {
         return "{ \"error\": \"Error parsing response: " + std::string(e.what()) + "\" }";
     }
+}
+
+/**
+ * Generate a random UUID string
+ * 
+ * @return A string containing a random UUID
+ */
+std::string generateUUID() {
+    boost::uuids::random_generator generator;
+    boost::uuids::uuid uuid = generator();
+    return boost::lexical_cast<std::string>(uuid);
+}
+
+/**
+ * Generate speech using OpenAI TTS API
+ * 
+ * @param text The text to convert to speech
+ * @param voice The voice to use (e.g., "alloy", "echo", "fable", "onyx", "nova", "shimmer")
+ * @return std::string containing the filename of the generated audio file
+ */
+std::string generateSpeech(const std::string& text, const std::string& voice) {
+    // Get API key from environment variable
+    const char* api_key = std::getenv("LLM_API_KEY");
+    if (!api_key) {
+        std::cerr << "Error: LLM_API_KEY environment variable not set." << std::endl;
+        return "";
+    }
+    
+    // Use a simpler approach - collect data in memory first
+    std::string response_data;
+    
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        std::cerr << "Error initializing CURL" << std::endl;
+        return "";
+    }
+
+    // Create JSON payload for TTS API
+    json payload = {
+        {"model", "tts-1"},
+        {"input", text},
+        {"voice", voice},
+        {"response_format", "mp3"}
+    };
+    
+    std::string json_payload = payload.dump();
+    std::string url = "https://api.openai.com/v1/audio/speech";
+    
+    // Set up headers
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    
+    std::string auth_header = "Authorization: Bearer ";
+    auth_header += api_key;
+    headers = curl_slist_append(headers, auth_header.c_str());
+
+    // Use the basic WriteCallback we already have
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
+
+    std::cout << "Generating speech for text: " << text << std::endl;
+    
+    // Perform the request
+    CURLcode res = curl_easy_perform(curl);
+    
+    // Clean up CURL
+    curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+    
+    if (res != CURLE_OK) {
+        std::cerr << "TTS API request failed: " << curl_easy_strerror(res) << std::endl;
+        return "";
+    }
+    
+    // Generate a unique filename with UUID
+    std::string filename = "speech_" + generateUUID() + ".mp3";
+    
+    // Now that we have the data in memory, write it to a file
+    std::ofstream outfile(filename, std::ios::binary);
+    if (!outfile.is_open()) {
+        std::cerr << "Error: Could not open file for writing: " << filename << std::endl;
+        return "";
+    }
+    
+    outfile.write(response_data.data(), response_data.size());
+    outfile.close();
+    
+    if (outfile.fail()) {
+        std::cerr << "Error writing to output file" << std::endl;
+        return "";
+    }
+    
+    // std::cout << "Speech generated and saved to: " << filename << std::endl;
+    return filename;
+}
+
+/**
+ * Generate Mandarin and Cantonese Audio Links and add onto Json Response
+ * 
+ * @param jsonResponse The JSON response from the API as a json object
+ * @return The modified JSON with audio links added
+ */
+json generateAudioLinks(const json& jsonResponse) {
+    json result = jsonResponse; // Make a copy to modify
+    
+    // Extract the text to convert to speech from the JSON
+    std::string mandarinText = "";
+    std::string cantoneseText = "";
+
+    std::cout << "Result: " << result << std::endl;
+    
+    if (result.contains("original_text")) {
+        mandarinText = result["original_text"].get<std::string>();
+    }
+    
+    if (result.contains("equivalent_cantonese")) {
+        cantoneseText = result["equivalent_cantonese"].get<std::string>();
+    }
+    
+    // Generate audio files only if we have text
+    if (!mandarinText.empty()) {
+        std::string mandarin_audio_link = generateSpeech(mandarinText, "alloy");
+        if (!mandarin_audio_link.empty()) {
+            result["mandarin_audio_link"] = mandarin_audio_link;
+        }
+    }
+    
+    if (!cantoneseText.empty()) {
+        std::string cantonese_audio_link = generateSpeech(cantoneseText, "alloy");
+        if (!cantonese_audio_link.empty()) {
+            result["cantonese_audio_link"] = cantonese_audio_link;
+        }
+    }
+
+    std::cout << "Generated audio links: " << result << std::endl;
+    return result;
 }

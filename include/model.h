@@ -12,13 +12,14 @@ using json = nlohmann::json;
  * Translation data structure
  */
 struct Translation {
+    std::string original_text;
     std::string meaning_english;
     std::string pinyin_mandarin;
     std::string jyutping_cantonese;
     std::string equivalent_cantonese;
 
     // Enable JSON serialization and deserialization
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(Translation, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(Translation, original_text, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese)
 
     // inline void to_json(json& j) const {
     //     j = json{
@@ -33,12 +34,13 @@ struct Translation {
         return json{
             {"type", "object"},
             {"properties", {
+                {"original_text", {{"type", "string"}}},
                 {"meaning_english", {{"type", "string"}}},
                 {"pinyin_mandarin", {{"type", "string"}}},
                 {"jyutping_cantonese", {{"type", "string"}}},
                 {"equivalent_cantonese", {{"type", "string"}}}
             }},
-            {"required", {"meaning_english", "pinyin_mandarin", "jyutping_cantonese", "equivalent_cantonese"}},
+            {"required", {"original_text", "meaning_english", "pinyin_mandarin", "jyutping_cantonese", "equivalent_cantonese"}},
             {"additionalProperties", false}
         };
     }

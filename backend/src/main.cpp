@@ -77,6 +77,7 @@ int main() {
                 // Create a more detailed prompt for translation
                 // TODO: Use a prompt file and load it
                 std::string prompt = "Translate the Chinese text \n\n'" + text + "'\n\nto English. Include:\n"
+                                    "- Original text\n"
                                     "- English meaning\n"
                                     "- Mandarin pronunciation (pinyin)\n"
                                     "- Cantonese pronunciation (jyutping)\n"
