@@ -5,6 +5,14 @@
 
 using json = nlohmann::json;
 
+const int MAX_TEXT_LENGTH = 500;
+
+bool TooMuchText(const wxString& text) {
+    if (text.Length() > MAX_TEXT_LENGTH) {
+        return true;
+    }
+    return false;
+}
 bool IsServerOnline() {
     try {
         wxString response = HttpClient::Get("http://localhost:8080/health");
@@ -409,8 +417,15 @@ void MainFrame::OnClose(wxCloseEvent& event)
 
 void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestamp)
 {
+    if (TooMuchText(text)) {
+        ShowError("Exceeded the maximum text length of " + wxString::Format("%d", MAX_TEXT_LENGTH) + " characters.", "Error");
+        return;
+    }
     std::cout << "GETTING LLM RESPONSE" << std::endl;
+    
+    
     json response = GetLLMResponse(text);
+    
     std::cout << "Response: " << response << std::endl;
     UpdateUIWithTranslation(response);
     RequestUserAttention(wxUSER_ATTENTION_INFO);
@@ -431,7 +446,10 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     // Perform OCR on the image
     if (OcrEngine::IsInitialized()) {
         wxString recognizedText = OcrEngine::ExtractTextFromBitmap(image);
-        
+        if (TooMuchText(recognizedText)) {
+            ShowError("Exceeded the maximum text length of " + wxString::Format("%d", MAX_TEXT_LENGTH) + " characters.", "Error");
+            return;
+        }
         if (!recognizedText.IsEmpty()) {
             json response = GetLLMResponse(recognizedText);
             std::cout << "Response: " << response << std::endl;
@@ -448,3 +466,13 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     // Update layout
     // m_mainPanel->Layout();
 } 
+
+
+
+void MainFrame::ShowError(const wxString& message, const wxString& title) {
+    wxLogError("%s", message);
+}
+
+void MainFrame::ShowWarning(const wxString& message) {
+    wxLogWarning("%s", message);
+}

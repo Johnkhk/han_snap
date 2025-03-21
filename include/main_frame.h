@@ -34,6 +34,12 @@ private:
     // Method to show waiting message
     void ShowWaitingMessage();
 
+    // Method to show error message
+    void ShowError(const wxString& message, const wxString& title);
+
+    // Method to show warning message
+    void ShowWarning(const wxString& message);
+
     // UI elements
     wxPanel* m_mainPanel;
     wxPanel* m_translationPanel;
