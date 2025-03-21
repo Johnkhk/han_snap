@@ -40,6 +40,9 @@ private:
     // Method to show warning message
     void ShowWarning(const wxString& message);
 
+    // Method to show translating message
+    void ShowTranslating();
+
     // UI elements
     wxPanel* m_mainPanel;
     wxPanel* m_translationPanel;

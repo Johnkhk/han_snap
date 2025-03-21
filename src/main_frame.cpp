@@ -424,6 +424,9 @@ void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestam
     std::cout << "GETTING LLM RESPONSE" << std::endl;
     
     
+    // while wating for LLM response, change the waiting message to "Translating..."
+    ShowTranslating();
+    
     json response = GetLLMResponse(text);
     
     std::cout << "Response: " << response << std::endl;
@@ -451,6 +454,7 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
             return;
         }
         if (!recognizedText.IsEmpty()) {
+            ShowTranslating();
             json response = GetLLMResponse(recognizedText);
             std::cout << "Response: " << response << std::endl;
             UpdateUIWithTranslation(response);
@@ -475,4 +479,10 @@ void MainFrame::ShowError(const wxString& message, const wxString& title) {
 
 void MainFrame::ShowWarning(const wxString& message) {
     wxLogWarning("%s", message);
+}
+
+void MainFrame::ShowTranslating() {
+    m_waitingMessage->SetLabel("Translating...");
+    m_mainPanel->Layout();
+    wxYield();
 }
