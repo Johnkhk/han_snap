@@ -5,6 +5,16 @@
 int main() {
     // Initialize libcurl at application startup
     curl_global_init(CURL_GLOBAL_ALL);
+
+    // Health check route
+    drogon::app().registerHandler("/health", 
+        [](const drogon::HttpRequestPtr& req, 
+           std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+            auto resp = drogon::HttpResponse::newHttpResponse();
+            resp->setBody("ok");
+            callback(resp);
+        },
+        {drogon::Get});
     
     // Simple GET route - Fix handler signature
     drogon::app().registerHandler("/hello", 

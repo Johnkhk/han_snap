@@ -5,20 +5,24 @@
 
 using json = nlohmann::json;
 
+bool IsServerOnline() {
+    try {
+        wxString response = HttpClient::Get("http://localhost:8080/health");
+        return response.Contains("ok") || response.Contains("OK");
+    } catch (...) {
+        return false;
+    }
+}
+
 json GetLLMResponse(const wxString& text) {
+
     // Escape any special characters in the recognized text
     wxString escapedText = text;
-    std::cout << "111111" << std::endl;
     escapedText.Replace("\\", "\\\\");
-    std::cout << "222222" << std::endl;
     escapedText.Replace("\"", "\\\"");
-    std::cout << "333333" << std::endl;
     escapedText.Replace("\n", "\\n");
-    std::cout << "444444" << std::endl;
     escapedText.Replace("\r", "\\r");
-    std::cout << "555555" << std::endl;
     escapedText.Replace("\t", "\\t");
-    std::cout << "666666" << std::endl;
     
     wxString jsonStr = "{\"text\": \"" + escapedText + "\"}";
     wxString response = HttpClient::Post("http://localhost:8080/llm", jsonStr);
@@ -36,6 +40,8 @@ MainFrame::MainFrame()
     : wxFrame(nullptr, wxID_ANY, "HanSnap - Chinese Translation", wxDefaultPosition, wxSize(800, 600)),
       m_lastProcessedTimestamp(wxDateTime::Now())  // Initialize with current time
 {
+
+
     // Set up status bar
     CreateStatusBar();
     SetStatusText("Waiting for clipboard content...");
@@ -60,6 +66,12 @@ MainFrame::MainFrame()
     
     waitingSizer->Add(m_waitingMessage, 0, wxALIGN_CENTER | wxALL, 20);
     
+    // First check if server is online
+    if (!IsServerOnline()) {
+        wxMessageBox("Server is offline. Please start the server and try again.", "Error", wxOK | wxICON_ERROR);
+        exit(1);
+    }
+
     // Add a helpful instruction message
     wxStaticText* instructionText = new wxStaticText(m_waitingPanel, wxID_ANY, 
         "Copy Chinese text or an image containing Chinese text to translate it automatically.",
@@ -136,7 +148,12 @@ MainFrame::MainFrame()
     
     // Add controls to left box (pinyin directly above original text)
     leftBox->Add(m_pinyinText, 1, wxEXPAND | wxALL, 5);
-    leftBox->Add(new wxStaticText(leftBox->GetStaticBox(), wxID_ANY, "Chinese:"), 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
+    
+    // Create and style the Chinese label
+    wxStaticText* chineseLabel = new wxStaticText(leftBox->GetStaticBox(), wxID_ANY, "Chinese:");
+    chineseLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text to match other labels
+    chineseLabel->SetFont(labelFont);  // Use the same font as other labels
+    leftBox->Add(chineseLabel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
     leftBox->Add(m_originalText, 2, wxEXPAND | wxALL, 5);
     
     // Right panel (Cantonese with Jyutping)
@@ -145,8 +162,8 @@ MainFrame::MainFrame()
     
     // Add "Cantonese" label
     wxStaticText* cantoneseLabel = new wxStaticText(rightBox->GetStaticBox(), wxID_ANY, "Cantonese");
-    cantoneseLabel->SetFont(labelFont);
     cantoneseLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
+    cantoneseLabel->SetFont(labelFont);
     rightBox->Add(cantoneseLabel, 0, wxEXPAND | wxALL, 5);
     
     // Create jyutping text control with scrolling
@@ -167,7 +184,13 @@ MainFrame::MainFrame()
     
     // Add controls to right box (jyutping directly above cantonese text)
     rightBox->Add(m_jyutpingText, 1, wxEXPAND | wxALL, 5);
-    rightBox->Add(new wxStaticText(rightBox->GetStaticBox(), wxID_ANY, "Cantonese:"), 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
+    
+    // Create and style the Cantonese text label
+    wxStaticText* cantoneseTextLabel = new wxStaticText(rightBox->GetStaticBox(), wxID_ANY, "Cantonese:");
+    cantoneseTextLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text to match other labels
+    cantoneseTextLabel->SetFont(labelFont);  // Use the same font as other labels
+    rightBox->Add(cantoneseTextLabel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
+    
     rightBox->Add(m_cantoneseText, 2, wxEXPAND | wxALL, 5);
     
     // Add both panels to the horizontal sizer
