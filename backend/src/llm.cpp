@@ -22,7 +22,7 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
 }
 
 json generateAudioLinks(const json& jsonResponse);
-std::string generateSpeech(const std::string& text, const std::string& voice);
+std::string generateSpeech(const std::string& text, const std::string& language, const std::string& voice);
 
 /**
  * Call ChatGPT API with a prompt and expected schema to get a JSON response
@@ -162,7 +162,7 @@ std::string generateUUID() {
  * @param voice The voice to use (e.g., "alloy", "echo", "fable", "onyx", "nova", "shimmer")
  * @return std::string containing the filename of the generated audio file
  */
-std::string generateSpeech(const std::string& text, const std::string& voice) {
+std::string generateSpeech(const std::string& text, const std::string& language, const std::string& voice) {
     // Get API key from environment variable
     const char* api_key = std::getenv("LLM_API_KEY");
     if (!api_key) {
@@ -183,6 +183,7 @@ std::string generateSpeech(const std::string& text, const std::string& voice) {
     json payload = {
         {"model", "tts-1"},
         {"input", text},
+        {"language", language},
         {"voice", voice},
         {"response_format", "mp3"}
     };
@@ -267,14 +268,14 @@ json generateAudioLinks(const json& jsonResponse) {
     
     // Generate audio files only if we have text
     if (!mandarinText.empty()) {
-        std::string mandarin_audio_link = generateSpeech(mandarinText, "alloy");
+        std::string mandarin_audio_link = generateSpeech(mandarinText, "mandarin", "alloy");
         if (!mandarin_audio_link.empty()) {
             result["mandarin_audio_link"] = mandarin_audio_link;
         }
     }
     
     if (!cantoneseText.empty()) {
-        std::string cantonese_audio_link = generateSpeech(cantoneseText, "alloy");
+        std::string cantonese_audio_link = generateSpeech(cantoneseText, "cantonese", "onyx");
         if (!cantonese_audio_link.empty()) {
             result["cantonese_audio_link"] = cantonese_audio_link;
         }
