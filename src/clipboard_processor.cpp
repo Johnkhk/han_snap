@@ -229,6 +229,7 @@ bool ClipboardProcessor::ProcessTextFormat()
         
         // Call the text callback if provided
         if (m_textCallback) {
+            std::cout << "ClipboardProcessor::ProcessTextFormat: Calling text callback on: text: " << clipboardText << " timestamp: " << m_clipboardData->timestamp.Format("%Y-%m-%d %H:%M:%S") << std::endl;
             m_textCallback(clipboardText, m_clipboardData->timestamp);
         }
         return true;

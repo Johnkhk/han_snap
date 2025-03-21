@@ -39,7 +39,8 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
         
         // Create JSON payload using nlohmann/json
         json payload = {
-            {"model", "gpt-4o"},
+            // {"model", "gpt-4o"},
+            {"model", "gpt-4o-mini"},
             {"messages", json::array({
                 {
                     {"role", "system"},

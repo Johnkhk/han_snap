@@ -32,73 +32,118 @@ bool OcrEngine::Initialize(const std::string& language) {
 }
 
 void OcrEngine::Cleanup() {
-    if (m_tessApi) {
-        tesseract::TessBaseAPI* api = static_cast<tesseract::TessBaseAPI*>(m_tessApi);
+    if (m_initialized) {
+        tesseract::TessBaseAPI* api = new tesseract::TessBaseAPI();
+        // This forces Tesseract to clean up its cached data
         api->End();
         delete api;
-        m_tessApi = nullptr;
         m_initialized = false;
     }
 }
 
 wxString OcrEngine::ExtractTextFromBitmap(const wxBitmap& bitmap) {
-    if (!IsInitialized()) {
-        wxLogError("OCR engine not initialized");
-        return wxEmptyString;
+    if (!m_initialized) {
+        return "";
     }
     
-    tesseract::TessBaseAPI* api = static_cast<tesseract::TessBaseAPI*>(m_tessApi);
+    // Create a new API instance for this extraction
+    tesseract::TessBaseAPI* api = new tesseract::TessBaseAPI();
     
-    // Convert wxBitmap to a format Tesseract can understand
-    wxImage image = bitmap.ConvertToImage();
-    
-    // Create a Leptonica PIX object from the wxImage
-    int width = image.GetWidth();
-    int height = image.GetHeight();
-    
-    // Always create a 32bpp image for Leptonica (RGBA format)
-    PIX* pix = pixCreate(width, height, 32);
-    if (!pix) {
-        wxLogError("Failed to create PIX object for OCR");
-        return wxEmptyString;
+    // Initialize API with existing language data
+    if (api->Init(NULL, "chi_sim+chi_tra") != 0) {
+        delete api;
+        return "Error initializing Tesseract";
     }
     
-    // Copy the pixel data from wxImage to PIX
-    const unsigned char* imageData = image.GetData();
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int offset = (y * width + x) * 3;
+    try {
+        // Set page segmentation mode to automatic
+        api->SetPageSegMode(tesseract::PSM_AUTO);
+        
+        // Set a timeout limit (10 seconds)
+        api->SetVariable("time_limit_per_page_ms", "10000");
+        
+        // Improve reliability for mixed scripts
+        api->SetVariable("preserve_interword_spaces", "1");
+        api->SetVariable("tessedit_char_blacklist", "");  // Clear any blacklists
+        
+        // Convert wxBitmap to format Tesseract can use
+        wxImage image = bitmap.ConvertToImage();
+        
+        // Resize very large images to prevent crashes
+        const int MAX_DIMENSION = 2000; // Maximum dimension in pixels
+        bool resized = false;
+        
+        if (image.GetWidth() > MAX_DIMENSION || image.GetHeight() > MAX_DIMENSION) {
+            // Calculate new dimensions while maintaining aspect ratio
+            double scale = std::min(
+                static_cast<double>(MAX_DIMENSION) / image.GetWidth(),
+                static_cast<double>(MAX_DIMENSION) / image.GetHeight()
+            );
             
-            // RGB values from image data
-            int r = imageData[offset];
-            int g = imageData[offset + 1];
-            int b = imageData[offset + 2];
+            int newWidth = static_cast<int>(image.GetWidth() * scale);
+            int newHeight = static_cast<int>(image.GetHeight() * scale);
             
-            // Set pixel in PIX with alpha = 255 (fully opaque)
-            pixSetRGBPixel(pix, x, y, r, g, b);
+            image.Rescale(newWidth, newHeight, wxIMAGE_QUALITY_HIGH);
+            resized = true;
+        }
+        
+        // Get image data
+        unsigned char* imageData = image.GetData();
+        int width = image.GetWidth();
+        int height = image.GetHeight();
+        int bytesPerPixel = 3; // RGB format
+        
+        // Set image data
+        api->SetImage(imageData, width, height, bytesPerPixel, width * bytesPerPixel);
+        
+        // Extract text with safer method to prevent crashes
+        char* outText = nullptr;
+        try {
+            outText = api->GetUTF8Text();
+            wxString result = wxString::FromUTF8(outText);
+            delete[] outText;
+            
+            // Clean up
+            api->Clear();
+            api->End();
+            delete api;
+            
+            if (resized) {
+                result = "Note: Image was resized for processing.\n\n" + result;
+            }
+            
+            return result;
+        }
+        catch (...) {
+            // Handle errors during text extraction
+            if (outText) {
+                delete[] outText;
+            }
+            throw; // Re-throw to be caught by outer catch block
         }
     }
-    
-    // Set the PIX image for OCR
-    api->SetImage(pix);
-    
-    // Get the recognized text
-    char* text = api->GetUTF8Text();
-    wxString result(text);
-    
-    // Log the result with proper type casting or format specifiers
-    if (result.IsEmpty()) {
-        wxLogDebug("OCR completed but no text was recognized");
-    } else {
-        wxLogDebug("OCR successfully recognized text (%zu characters)", 
-                  (size_t)result.Length());
+    catch (const std::exception& e) {
+        // Handle any exceptions
+        try {
+            api->Clear();
+            api->End();
+            delete api;
+        } catch (...) {
+            // Ignore any errors during cleanup
+        }
+        return wxString::Format("OCR Error: %s", e.what());
     }
-    
-    // Clean up
-    delete[] text;
-    pixDestroy(&pix);
-    
-    return result;
+    catch (...) {
+        // Handle any other unexpected exceptions
+        try {
+            api->Clear();
+            api->End();
+            delete api;
+        } catch (...) {
+            // Ignore any errors during cleanup
+        }
+        return "Unknown OCR error occurred";
+    }
 }
 
 wxString OcrEngine::ExtractTextFromFile(const wxString& filePath) {

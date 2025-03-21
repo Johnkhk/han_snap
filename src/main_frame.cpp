@@ -8,14 +8,26 @@ using json = nlohmann::json;
 json GetLLMResponse(const wxString& text) {
     // Escape any special characters in the recognized text
     wxString escapedText = text;
+    std::cout << "111111" << std::endl;
     escapedText.Replace("\\", "\\\\");
+    std::cout << "222222" << std::endl;
     escapedText.Replace("\"", "\\\"");
+    std::cout << "333333" << std::endl;
     escapedText.Replace("\n", "\\n");
+    std::cout << "444444" << std::endl;
     escapedText.Replace("\r", "\\r");
+    std::cout << "555555" << std::endl;
     escapedText.Replace("\t", "\\t");
+    std::cout << "666666" << std::endl;
     
     wxString jsonStr = "{\"text\": \"" + escapedText + "\"}";
     wxString response = HttpClient::Post("http://localhost:8080/llm", jsonStr);
+
+    // check if response is ok
+    if (response.Contains("error")) {
+        std::cout << "Error: " << response << std::endl;
+        return json::parse("{\"error\": \"Failed to get response from LLM\"}");
+    }
     
     return json::parse(response);
 }
@@ -79,13 +91,13 @@ MainFrame::MainFrame()
     englishBox->Add(meaningLabel, 0, wxEXPAND | wxALL, 5);
     
     m_englishMeaningText = new wxTextCtrl(englishBox->GetStaticBox(), wxID_ANY, "", 
-                                         wxDefaultPosition, wxDefaultSize,
-                                         wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+                                         wxDefaultPosition, wxSize(-1, 100),  
+                                         wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxHSCROLL);
     wxFont englishFont = m_englishMeaningText->GetFont();
     englishFont.SetPointSize(englishFont.GetPointSize() + 2);
     m_englishMeaningText->SetFont(englishFont);
-    m_englishMeaningText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
-    m_englishMeaningText->SetBackgroundColour(wxColour(250, 250, 255));  // Very light blue background
+    m_englishMeaningText->SetForegroundColour(wxColour(0, 0, 0));
+    m_englishMeaningText->SetBackgroundColour(wxColour(250, 250, 255));
     
     englishBox->Add(m_englishMeaningText, 1, wxEXPAND | wxALL, 5);
     
@@ -102,20 +114,20 @@ MainFrame::MainFrame()
     mandarinLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
     leftBox->Add(mandarinLabel, 0, wxEXPAND | wxALL, 5);
     
-    // Create pinyin text control
+    // Create pinyin text control with scrolling
     m_pinyinText = new wxTextCtrl(leftBox->GetStaticBox(), wxID_ANY, "", 
                                  wxDefaultPosition, wxDefaultSize,
-                                 wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+                                 wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxHSCROLL);
     m_pinyinText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
     m_pinyinText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     wxFont pinyinFont = m_pinyinText->GetFont();
     pinyinFont.SetPointSize(pinyinFont.GetPointSize() + 1);
     m_pinyinText->SetFont(pinyinFont);
     
-    // Create original text control
+    // Create original text control with scrolling
     m_originalText = new wxTextCtrl(leftBox->GetStaticBox(), wxID_ANY, "", 
                                    wxDefaultPosition, wxDefaultSize,
-                                   wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+                                   wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxHSCROLL);
     wxFont chineseFont = m_originalText->GetFont();
     chineseFont.SetPointSize(chineseFont.GetPointSize() + 4);
     m_originalText->SetFont(chineseFont);
@@ -137,18 +149,18 @@ MainFrame::MainFrame()
     cantoneseLabel->SetForegroundColour(wxColour(30, 30, 120));  // Dark blue text
     rightBox->Add(cantoneseLabel, 0, wxEXPAND | wxALL, 5);
     
-    // Create jyutping text control
+    // Create jyutping text control with scrolling
     m_jyutpingText = new wxTextCtrl(rightBox->GetStaticBox(), wxID_ANY, "", 
                                    wxDefaultPosition, wxDefaultSize,
-                                   wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+                                   wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxHSCROLL);
     m_jyutpingText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
     m_jyutpingText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     m_jyutpingText->SetFont(pinyinFont);  // Use same font as pinyin
     
-    // Create cantonese text control
+    // Create cantonese text control with scrolling
     m_cantoneseText = new wxTextCtrl(rightBox->GetStaticBox(), wxID_ANY, "", 
                                     wxDefaultPosition, wxDefaultSize,
-                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH);
+                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxHSCROLL);
     m_cantoneseText->SetForegroundColour(wxColour(0, 0, 0));  // Black text
     m_cantoneseText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     m_cantoneseText->SetFont(chineseFont);
@@ -223,12 +235,6 @@ MainFrame::MainFrame()
         m_taskBarIcon->SetIcon(icon, "HanSnap - Chinese Translation");
     }
     
-    // Initialize OCR for Chinese
-    if (!OcrEngine::IsInitialized()) {
-        if (!OcrEngine::Initialize("chi_sim+chi_tra")) {
-            wxLogError("Failed to initialize OCR engine for Chinese");
-        }
-    }
     
     // Start with waiting message
     ShowWaitingMessage();
@@ -236,7 +242,10 @@ MainFrame::MainFrame()
 
 MainFrame::~MainFrame()
 {
-    // Clean up
+    // Clean up OCR engine to prevent memory leaks
+    OcrEngine::Cleanup();
+    
+    // Clean up taskbar icon
     if (m_taskBarIcon) {
         m_taskBarIcon->RemoveIcon();
         delete m_taskBarIcon;
@@ -264,48 +273,77 @@ void MainFrame::UpdateUIWithTranslation(const json& response)
     // Update status bar
     SetStatusText("Translation completed");
     
-    // Extract data from JSON response
-    if (response.contains("translation") && 
-        response["translation"].contains("text") && 
-        response["translation"].contains("result")) {
+    // Freeze window to prevent flickering during updates
+    Freeze();
+    
+    try {
+        // Extract data from JSON response
+        if (!response.contains("translation") || 
+            !response["translation"].contains("text") || 
+            !response["translation"].contains("result")) {
+            m_englishMeaningText->ChangeValue("Error: Invalid response format");
+            Thaw();
+            return;
+        }
         
-        // Get original text
-        wxString originalText = wxString::FromUTF8(response["translation"]["text"].get<std::string>());
-        m_originalText->SetValue(originalText);
-        
-        // Get translation data
         const auto& result = response["translation"]["result"];
         
+        // Update all text controls in a batch operation
+        // Original text
+        if (response["translation"].contains("text")) {
+            std::string textStr = response["translation"]["text"].get<std::string>();
+            wxString originalText = wxString::FromUTF8(textStr);
+            m_originalText->ChangeValue(originalText);
+        }
+        
+        // English meaning
         if (result.contains("meaning_english")) {
-            wxString english = wxString::FromUTF8(result["meaning_english"].get<std::string>());
-            m_englishMeaningText->SetValue(english);
+            std::string engStr = result["meaning_english"].get<std::string>();
+            wxString english = wxString::FromUTF8(engStr);
+            m_englishMeaningText->ChangeValue(english);
         }
         
+        // Pinyin
         if (result.contains("pinyin_mandarin")) {
-            wxString pinyin = wxString::FromUTF8(result["pinyin_mandarin"].get<std::string>());
-            m_pinyinText->SetValue(pinyin);
+            std::string pinyinStr = result["pinyin_mandarin"].get<std::string>();
+            wxString pinyin = wxString::FromUTF8(pinyinStr);
+            m_pinyinText->ChangeValue(pinyin);
         }
         
+        // Jyutping
         if (result.contains("jyutping_cantonese")) {
-            wxString jyutping = wxString::FromUTF8(result["jyutping_cantonese"].get<std::string>());
-            m_jyutpingText->SetValue(jyutping);
+            std::string jyutpingStr = result["jyutping_cantonese"].get<std::string>();
+            wxString jyutping = wxString::FromUTF8(jyutpingStr);
+            m_jyutpingText->ChangeValue(jyutping);
         }
         
+        // Cantonese
         if (result.contains("equivalent_cantonese")) {
-            wxString cantonese = wxString::FromUTF8(result["equivalent_cantonese"].get<std::string>());
-            m_cantoneseText->SetValue(cantonese);
+            std::string cantoneseStr = result["equivalent_cantonese"].get<std::string>();
+            wxString cantonese = wxString::FromUTF8(cantoneseStr);
+            m_cantoneseText->ChangeValue(cantonese);
         }
-    } else {
-        // Handle error in response
-        m_englishMeaningText->SetValue("Error processing translation.");
         
-        if (response.contains("error")) {
-            wxString errorMsg = wxString::FromUTF8(response["error"].get<std::string>());
-            m_englishMeaningText->SetValue("Error: " + errorMsg);
-        }
+        // Scroll all text controls to top
+        m_englishMeaningText->ShowPosition(0);
+        m_originalText->ShowPosition(0);
+        m_pinyinText->ShowPosition(0);
+        m_jyutpingText->ShowPosition(0);
+        m_cantoneseText->ShowPosition(0);
+        
+    } catch (const std::exception& e) {
+        // Handle any JSON parsing exceptions
+        wxString errorMsg = wxString::Format("Error processing response: %s", e.what());
+        wxLogError(errorMsg);
+        m_englishMeaningText->ChangeValue(errorMsg);
+    } catch (...) {
+        // Catch any other exceptions
+        wxLogError("Unknown error occurred while updating UI");
+        m_englishMeaningText->ChangeValue("Unknown error occurred while updating UI");
     }
     
-    // Update layout
+    // Thaw and update layout
+    Thaw();
     m_mainPanel->Layout();
 }
 
@@ -322,14 +360,9 @@ void MainFrame::OnToggleApp(wxCommandEvent& event)
         // Start clipboard monitoring
         m_clipboardProcessor->Start();
         
-        // Show the window, bring to front, and focus
+        // Show the window
         Show();
         Raise();
-        RequestUserAttention(wxUSER_ATTENTION_INFO);
-        SetFocus();
-        
-        // Update status
-        SetStatusText("Clipboard monitoring active");
     } else {
         // We're turning the app off
         // Stop clipboard monitoring
@@ -353,6 +386,7 @@ void MainFrame::OnClose(wxCloseEvent& event)
 
 void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestamp)
 {
+    std::cout << "GETTING LLM RESPONSE" << std::endl;
     json response = GetLLMResponse(text);
     std::cout << "Response: " << response << std::endl;
     UpdateUIWithTranslation(response);
@@ -364,6 +398,12 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     // Show the image preview
     // m_imageDisplay->SetBitmap(image);
     // m_imageDisplay->Show();
+    // Initialize OCR for Chinese
+    if (!OcrEngine::IsInitialized()) {
+        if (!OcrEngine::Initialize("chi_sim+chi_tra")) {
+            wxLogError("Failed to initialize OCR engine for Chinese");
+        }
+    }
     
     // Perform OCR on the image
     if (OcrEngine::IsInitialized()) {
@@ -383,5 +423,5 @@ void MainFrame::OnClipboardImage(const wxBitmap& image, const wxDateTime& timest
     }
     
     // Update layout
-    m_mainPanel->Layout();
+    // m_mainPanel->Layout();
 } 
