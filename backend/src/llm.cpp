@@ -185,6 +185,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
         {"input", text},
         {"language", language},
         {"voice", voice},
+        // {"instructions", "Speak in cantonese"},
         {"response_format", "mp3"}
     };
     
@@ -274,12 +275,12 @@ json generateAudioLinks(const json& jsonResponse) {
         }
     }
     
-    if (!cantoneseText.empty()) {
-        std::string cantonese_audio_link = generateSpeech(cantoneseText, "cantonese", "onyx");
-        if (!cantonese_audio_link.empty()) {
-            result["cantonese_audio_link"] = cantonese_audio_link;
-        }
-    }
+    // if (!cantoneseText.empty()) {
+    //     std::string cantonese_audio_link = generateSpeech(cantoneseText, "cantonese", "alloy");
+    //     if (!cantonese_audio_link.empty()) {
+    //         result["cantonese_audio_link"] = cantonese_audio_link;
+    //     }
+    // }
 
     std::cout << "Generated audio links: " << result << std::endl;
     return result;

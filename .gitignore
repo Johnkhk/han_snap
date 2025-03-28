@@ -81,3 +81,6 @@ Makefile
 # Backup files
 *.bak
 *.old
+
+_deps/
+.env

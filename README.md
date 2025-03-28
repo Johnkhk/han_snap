@@ -1,6 +1,8 @@
 # han_snap
 
-## First Time Build Instructions
+## Build Instructions
+
+### First Time Build Instructions
 
 1. Ensure you have CMake installed (version 3.10 or higher).
 2. Ensure you have wxWidgets installed.
@@ -25,7 +27,7 @@
    cmake --build .
    ```
 
-## After First Time Build Instructions
+### After First Time Build Instructions
 
 1. Navigate to the build directory:
    ```
@@ -45,7 +47,13 @@
 
 
 
-## Just running LLM.cpp
+### Just running LLM.cpp
 ```
 g++ -o myapp src/llm.cpp -std=c++17 -I/opt/homebrew/include -lcurl
 ```
+
+<!-- ## Testing
+
+```
+cmake -S . -B build && cmake --build build && ctest --test-dir build
+``` -->
