@@ -37,6 +37,19 @@ public:
     // Audio file operations
     int storeAudioFile(const std::string& mimeType, const std::string& audioFilePath);
     bool getAudioData(int audioFileId, std::string& mimeType, std::string& audioData);
+    
+    // Transaction methods for testing
+    bool beginTransaction() {
+        return executeQuery("START TRANSACTION");
+    }
+    
+    bool commitTransaction() {
+        return executeQuery("COMMIT");
+    }
+    
+    bool rollbackTransaction() {
+        return executeQuery("ROLLBACK");
+    }
 
 private:
     // Database connection properties

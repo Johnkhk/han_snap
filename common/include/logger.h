@@ -187,8 +187,16 @@ public:
 private:
     Logger() : m_initialized(false) {}
     ~Logger() {
-        // Shutdown spdlog to flush any pending logs
-        spdlog::shutdown();
+        try {
+            // Only call shutdown if we initialized
+            if (m_initialized) {
+                spdlog::shutdown();
+                m_initialized = false;
+            }
+        } catch (...) {
+            // Suppress any exceptions during shutdown
+            std::cerr << "Warning: Exception during logger shutdown" << std::endl;
+        }
     }
     
     Logger(const Logger&) = delete;
