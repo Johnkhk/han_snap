@@ -1,5 +1,5 @@
+#include "test_utils.h"
 #include "../include/database.h"
-#include "../../common/include/logger.h"
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -7,15 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-// Test-specific logging macros
-#define TEST_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(test_logger, __VA_ARGS__)
-#define TEST_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(test_logger, __VA_ARGS__)
-#define TEST_LOG_INFO(...) SPDLOG_LOGGER_INFO(test_logger, __VA_ARGS__)
-#define TEST_LOG_WARNING(...) SPDLOG_LOGGER_WARN(test_logger, __VA_ARGS__)
-#define TEST_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(test_logger, __VA_ARGS__)
-#define TEST_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(test_logger, __VA_ARGS__)
-
-// Global test logger
+// Global test logger definition
 std::shared_ptr<spdlog::logger> test_logger;
 
 // Function to run SQL script
@@ -49,16 +41,12 @@ protected:
     
     // Set up logging once for all test cases
     static void SetUpTestSuite() {
-        // Initialize the logger
+        // Initialize the logger once for all tests
         hansnap::Logger::getInstance().initialize("hansnap_tests");
-        
-        // Set log level for tests
         hansnap::Logger::getInstance().setLevel(hansnap::Logger::Level::DEBUG);
-        
-        // Add file logging for tests
         hansnap::Logger::getInstance().addFileLogger("database_tests.log");
         
-        // Get the test logger
+        // Create the test logger
         test_logger = hansnap::Logger::getInstance().createLogger("db_tests");
         
         TEST_LOG_INFO("DatabaseTest suite started");
