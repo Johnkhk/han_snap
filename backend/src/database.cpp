@@ -1,10 +1,22 @@
 #include "../include/database.h"
+#include "../../common/include/logger.h"
 #include <iostream>
 #include <cstdlib> // For getenv
 #include <stdexcept>
 #include <fstream>
 
+// Component-specific logging macros
+#define DB_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(m_logger, __VA_ARGS__)
+#define DB_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(m_logger, __VA_ARGS__)
+#define DB_LOG_INFO(...) SPDLOG_LOGGER_INFO(m_logger, __VA_ARGS__)
+#define DB_LOG_WARNING(...) SPDLOG_LOGGER_WARN(m_logger, __VA_ARGS__)
+#define DB_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(m_logger, __VA_ARGS__)
+#define DB_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(m_logger, __VA_ARGS__)
+
 Database::Database() : port(33060) {
+    // Get the component logger
+    m_logger = hansnap::Logger::getInstance().createLogger("database");
+    
     loadConfig();
 }
 
@@ -26,6 +38,9 @@ void Database::loadConfig() {
     password = db_password ? db_password : "";
     database = db_name ? db_name : "hansnap_db";
     port = db_port ? std::stoi(db_port) : 33060; // X Protocol default port
+    
+    DB_LOG_DEBUG("Database config loaded: host={}, user={}, database={}, port={}",
+                host, user, database, port);
 }
 
 bool Database::connect() {
@@ -39,11 +54,11 @@ bool Database::connect() {
             mysqlx::SessionOption::DB, database
         );
         
-        std::cout << "Successfully connected to MySQL database: " << database << std::endl;
+        DB_LOG_INFO("Connected to MySQL database: {}", database);
         return true;
     }
     catch (const std::exception &e) {
-        std::cerr << "Connection Error: " << e.what() << std::endl;
+        DB_LOG_ERROR("Connection error: {}", e.what());
         return false;
     }
 }
@@ -55,7 +70,7 @@ bool Database::isConnected() const {
 void Database::disconnect() {
     if (isConnected()) {
         session.reset();
-        std::cout << "Disconnected from MySQL database" << std::endl;
+        DB_LOG_INFO("Disconnected from MySQL database");
     }
 }
 
@@ -69,7 +84,7 @@ bool Database::executeQuery(const std::string& query) {
         return true;
     }
     catch (const std::exception &e) {
-        std::cerr << "SQL Error: " << e.what() << std::endl;
+        DB_LOG_ERROR("SQL error: {}", e.what());
         return false;
     }
 }
@@ -106,11 +121,11 @@ bool Database::storeTranslation(const std::string& originalText,
                          .bind(audioFileId);
         
         stmt.execute();
-        std::cout << "Successfully stored translation" << std::endl;
+        DB_LOG_INFO("Successfully stored translation");
         return true;
     }
     catch (const std::exception &e) {
-        std::cerr << "Error in storeTranslation: " << e.what() << std::endl;
+        DB_LOG_ERROR("Error in storeTranslation: {}", e.what());
         return false;
     }
 }
@@ -145,7 +160,7 @@ bool Database::getTranslation(const std::string& originalText,
         }
     }
     catch (const std::exception &e) {
-        std::cerr << "Error in getTranslation: " << e.what() << std::endl;
+        DB_LOG_ERROR("Error in getTranslation: {}", e.what());
         return false;
     }
 }
@@ -159,7 +174,7 @@ int Database::storeAudioFile(const std::string& mimeType, const std::string& aud
         // Read audio data from file
         std::ifstream audioFile(audioFilePath, std::ios::binary);
         if (!audioFile) {
-            std::cerr << "Could not open audio file: " << audioFilePath << std::endl;
+            DB_LOG_ERROR("Could not open audio file: {}", audioFilePath);
             return -1;
         }
         
@@ -178,11 +193,11 @@ int Database::storeAudioFile(const std::string& mimeType, const std::string& aud
         auto row = idResult.fetchOne();
         int audioFileId = row[0].get<int>();
         
-        std::cout << "Successfully stored audio file with ID: " << audioFileId << std::endl;
+        DB_LOG_INFO("Successfully stored audio file with ID: {}", audioFileId);
         return audioFileId;
     }
     catch (const std::exception &e) {
-        std::cerr << "Error in storeAudioFile: " << e.what() << std::endl;
+        DB_LOG_ERROR("Error in storeAudioFile: {}", e.what());
         return -1;
     }
 }
@@ -206,7 +221,7 @@ bool Database::getAudioData(int audioFileId, std::string& mimeType, std::string&
         }
     }
     catch (const std::exception &e) {
-        std::cerr << "Error in getAudioData: " << e.what() << std::endl;
+        DB_LOG_ERROR("Error in getAudioData: {}", e.what());
         return false;
     }
 } 

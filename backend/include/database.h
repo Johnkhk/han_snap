@@ -6,6 +6,7 @@
 #include <memory>
 // Use X DevAPI headers instead
 #include <mysqlx/xdevapi.h>
+#include <spdlog/spdlog.h>
 
 class Database {
 public:
@@ -40,6 +41,9 @@ public:
 private:
     // Database connection properties
     std::unique_ptr<mysqlx::Session> session;
+    
+    // Logger for this component
+    std::shared_ptr<spdlog::logger> m_logger;
     
     // Connection parameters (read from environment or config)
     std::string host;

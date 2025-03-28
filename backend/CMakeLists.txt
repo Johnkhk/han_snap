@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(drogon_backend)
 
+# Set the policy to allow linking to targets in other directories
+cmake_policy(SET CMP0079 NEW)
+
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +77,10 @@ target_link_libraries(database_lib PUBLIC
 find_package(OpenSSL REQUIRED)
 message(STATUS "Found OpenSSL: ${OPENSSL_LIBRARIES}")
 
+# Find spdlog package
+find_package(spdlog REQUIRED)
+message(STATUS "Found spdlog: ${spdlog_VERSION}")
+
 # Create main executable
 add_executable(drogon_backend 
     src/main.cpp
@@ -94,8 +101,50 @@ target_link_libraries(drogon_backend PRIVATE
     ${Boost_LIBRARIES}
     OpenSSL::SSL
     OpenSSL::Crypto
+    spdlog::spdlog
 )
 
-# Enable testing for the backend
+# Google Test setup
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(googletest)
+
+# Enable testing
 enable_testing()
-add_subdirectory(tests)
+
+# Add test executable
+add_executable(database_tests tests/database_tests.cpp)
+target_link_libraries(database_tests
+  database_lib
+  gtest_main
+  spdlog::spdlog
+)
+
+# Include common include directory
+target_include_directories(database_tests PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../common/include
+)
+
+include(GoogleTest)
+gtest_discover_tests(database_tests)
+
+# Update database_lib to link with spdlog
+target_link_libraries(database_lib PUBLIC 
+    ${MYSQL_LIBRARY}
+    mysql::concpp
+    spdlog::spdlog
+)
+
+# And for your test executables
+target_link_libraries(database_tests
+  database_lib
+  gtest_main
+  spdlog::spdlog
+)
+
+# Add common include directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common/include)

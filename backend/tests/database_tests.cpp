@@ -1,4 +1,5 @@
 #include "../include/database.h"
+#include "../../common/include/logger.h"
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -6,11 +7,23 @@
 #include <cstdio>
 #include <cstdlib>
 
+// Test-specific logging macros
+#define TEST_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(test_logger, __VA_ARGS__)
+#define TEST_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(test_logger, __VA_ARGS__)
+#define TEST_LOG_INFO(...) SPDLOG_LOGGER_INFO(test_logger, __VA_ARGS__)
+#define TEST_LOG_WARNING(...) SPDLOG_LOGGER_WARN(test_logger, __VA_ARGS__)
+#define TEST_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(test_logger, __VA_ARGS__)
+#define TEST_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(test_logger, __VA_ARGS__)
+
+// Global test logger
+std::shared_ptr<spdlog::logger> test_logger;
+
 // Function to run SQL script
 bool runSqlScript(const std::string& scriptPath, const std::string& database) {
     // Use the hansnap login path
     std::string command = "mysql --login-path=hansnap " + database + " < " + scriptPath;
     
+    TEST_LOG_DEBUG("Executing SQL script: {} on {}", scriptPath, database);
     int result = system(command.c_str());
     return (result == 0);
 }
@@ -34,45 +47,62 @@ protected:
     std::string dbName;
     Database db;
     
+    // Set up logging once for all test cases
+    static void SetUpTestSuite() {
+        // Initialize the logger
+        hansnap::Logger::getInstance().initialize("hansnap_tests");
+        
+        // Set log level for tests
+        hansnap::Logger::getInstance().setLevel(hansnap::Logger::Level::DEBUG);
+        
+        // Add file logging for tests
+        hansnap::Logger::getInstance().addFileLogger("database_tests.log");
+        
+        // Get the test logger
+        test_logger = hansnap::Logger::getInstance().createLogger("db_tests");
+        
+        TEST_LOG_INFO("DatabaseTest suite started");
+    }
+    
+    static void TearDownTestSuite() {
+        TEST_LOG_INFO("DatabaseTest suite completed");
+    }
+    
     void SetUp() override {
         // Setup test database
         dbName = "hansnap_test_db";
         
-        std::cout << "Setting up test database: " << dbName << std::endl;
+        TEST_LOG_INFO("Setting up test database: {}", dbName);
         
         // Create test database using login path
         std::string createDbCmd = "mysql --login-path=hansnap -e \"CREATE DATABASE IF NOT EXISTS " + dbName + "\"";
         system(createDbCmd.c_str());
         
-        // Run migrations
-        std::cout << "Running migrations down..." << std::endl;
+        TEST_LOG_INFO("Running migrations down...");
         runSqlScript("../db/01_down.sql", dbName);
-        std::cout << "Running migrations up..." << std::endl;
+        TEST_LOG_INFO("Running migrations up...");
         runSqlScript("../db/02_up.sql", dbName);
-        
-        // The Database class should also use the same login path mechanism
-        // or environment variables that have been set externally
     }
     
     void TearDown() override {
         // Clean up: drop test database
         std::string dropDbCmd = "mysql --login-path=hansnap -e \"DROP DATABASE IF EXISTS " + dbName + "\"";
         system(dropDbCmd.c_str());
-        std::cout << "Test database dropped: " << dbName << std::endl;
+        TEST_LOG_INFO("Test database dropped: {}", dbName);
     }
 };
 
 TEST_F(DatabaseTest, TestConnection) {
-    std::cout << "Testing database connection..." << std::endl;
+    TEST_LOG_INFO("Testing database connection...");
     ASSERT_TRUE(db.connect());
     ASSERT_TRUE(db.isConnected());
     db.disconnect();
     ASSERT_FALSE(db.isConnected());
-    std::cout << "Connection test passed!" << std::endl;
+    TEST_LOG_INFO("Connection test completed");
 }
 
 TEST_F(DatabaseTest, TestTranslations) {
-    std::cout << "Testing translation operations..." << std::endl;
+    TEST_LOG_INFO("Testing translation operations...");
     
     // Re-connect if needed
     if (!db.isConnected()) {
@@ -167,11 +197,11 @@ TEST_F(DatabaseTest, TestTranslations) {
     EXPECT_EQ(retrievedUpdatedEnglish, updatedEnglish);
     EXPECT_EQ(retrievedUpdatedPinyin, updatedPinyin);
     
-    std::cout << "Translation operations test passed!" << std::endl;
+    TEST_LOG_INFO("Translation operations test passed!");
 }
 
 TEST_F(DatabaseTest, TestAudioFiles) {
-    std::cout << "Testing audio file operations..." << std::endl;
+    TEST_LOG_INFO("Testing audio file operations...");
     
     // Re-connect if needed
     if (!db.isConnected()) {
@@ -236,5 +266,5 @@ TEST_F(DatabaseTest, TestAudioFiles) {
     // Clean up test file
     remove(audioFilePath.c_str());
     
-    std::cout << "Audio file operations test passed!" << std::endl;
+    TEST_LOG_INFO("Audio file operations test passed!");
 }

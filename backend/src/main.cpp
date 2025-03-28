@@ -1,8 +1,28 @@
 #include <drogon/drogon.h>
 #include <curl/curl.h>  // Add this for CURL_GLOBAL_ALL
 #include "../include/llm.h"  // Include the LLM header
+#include "logger.h"
 
 int main() {
+    // Initialize the logger first thing
+    hansnap::Logger::getInstance().initialize("hansnap_backend");
+    
+    // Set log level based on environment 
+    const char* log_level = std::getenv("LOG_LEVEL");
+    if (log_level) {
+        std::string level(log_level);
+        if (level == "debug") {
+            hansnap::Logger::getInstance().setLevel(hansnap::Logger::Level::DEBUG);
+        } else if (level == "trace") {
+            hansnap::Logger::getInstance().setLevel(hansnap::Logger::Level::TRACE);
+        }
+    }
+    
+    // Add file logging
+    hansnap::Logger::getInstance().addFileLogger("backend.log");
+    
+    LOG_INFO("Starting Hansnap backend server...");
+    
     // Initialize libcurl at application startup
     curl_global_init(CURL_GLOBAL_ALL);
 

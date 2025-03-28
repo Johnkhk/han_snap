@@ -35,5 +35,5 @@ Running the tests
 ```bash
 cmake ..
 cmake --build . --target database_tests
-./tests/database_tests
+./database_tests
 ```
