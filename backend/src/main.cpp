@@ -60,7 +60,7 @@ int main() {
         [](const drogon::HttpRequestPtr& req, 
            std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
             auto resp = drogon::HttpResponse::newHttpResponse();
-            std::cout << "Hello, Drogon!" << std::endl;
+            MAIN_LOG_INFO("Hello, Drogon!");
             resp->setBody("Hello, Drogon!");
             callback(resp);
         },
@@ -71,7 +71,7 @@ int main() {
         [](const drogon::HttpRequestPtr& req, 
            std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
             
-            std::cout << "LLM route called" << std::endl;
+            MAIN_LOG_INFO("LLM route called");
             // Create a response
             auto resp = drogon::HttpResponse::newHttpResponse();
             

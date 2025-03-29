@@ -128,7 +128,8 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
 // Parse JSON response and return just the JSON content (not the OpenAI wrapper)
 std::string extractJSONContent(const std::string& rawResponse) {
     try {
-        std::cout << "Raw API response: " << rawResponse << std::endl;
+        LLM_LOG_DEBUG("Raw API response: {}", rawResponse);
+        
         json response = json::parse(rawResponse);
         
         // Check if there's an error
@@ -181,7 +182,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     // Get API key from environment variable
     const char* api_key = std::getenv("LLM_API_KEY");
     if (!api_key) {
-        std::cerr << "Error: LLM_API_KEY environment variable not set." << std::endl;
+        LLM_LOG_ERROR("LLM_API_KEY environment variable not set");
         return "";
     }
     
@@ -190,7 +191,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     
     CURL* curl = curl_easy_init();
     if (!curl) {
-        std::cerr << "Error initializing CURL" << std::endl;
+        LLM_LOG_ERROR("Error initializing CURL");
         return "";
     }
 
@@ -223,7 +224,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
 
-    std::cout << "Generating speech for text: " << text << std::endl;
+    LLM_LOG_INFO("Generating speech for text: {}", text);
     
     // Perform the request
     CURLcode res = curl_easy_perform(curl);
@@ -233,7 +234,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     curl_slist_free_all(headers);
     
     if (res != CURLE_OK) {
-        std::cerr << "TTS API request failed: " << curl_easy_strerror(res) << std::endl;
+        LLM_LOG_ERROR("TTS API request failed: {}", curl_easy_strerror(res));
         return "";
     }
     
@@ -243,7 +244,7 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     // Now that we have the data in memory, write it to a file
     std::ofstream outfile(filename, std::ios::binary);
     if (!outfile.is_open()) {
-        std::cerr << "Error: Could not open file for writing: " << filename << std::endl;
+        LLM_LOG_ERROR("Could not open file for writing: {}", filename);
         return "";
     }
     
@@ -251,11 +252,11 @@ std::string generateSpeech(const std::string& text, const std::string& language,
     outfile.close();
     
     if (outfile.fail()) {
-        std::cerr << "Error writing to output file" << std::endl;
+        LLM_LOG_ERROR("Error writing to output file");
         return "";
     }
     
-    // std::cout << "Speech generated and saved to: " << filename << std::endl;
+    LLM_LOG_INFO("Speech generated and saved to: {}", filename);
     return filename;
 }
 
@@ -272,7 +273,7 @@ json generateAudioLinks(const json& jsonResponse) {
     std::string mandarinText = "";
     std::string cantoneseText = "";
 
-    std::cout << "Result: " << result << std::endl;
+    LLM_LOG_DEBUG("JSON Response: {}", result.dump());
     
     if (result.contains("original_text")) {
         mandarinText = result["original_text"].get<std::string>();
@@ -297,6 +298,6 @@ json generateAudioLinks(const json& jsonResponse) {
     //     }
     // }
 
-    std::cout << "Generated audio links: " << result << std::endl;
+    LLM_LOG_INFO("Generated audio links: {}", result.dump());
     return result;
 }
