@@ -12,6 +12,9 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
 #include "../../common/include/logger.h"
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
+#include <openssl/evp.h>  // Add this line for base64 functions
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
@@ -38,6 +41,8 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* out
 
 json generateAudioLinks(const json& jsonResponse);
 std::string generateSpeech(const std::string& text, const std::string& language, const std::string& voice);
+std::string generateSpeechGoogle(const std::string& text, const std::string& languageCode, const std::string& voice);
+std::string base64_decode(const std::string& encoded);
 
 /**
  * Call ChatGPT API with a prompt and expected schema to get a JSON response
@@ -291,13 +296,149 @@ json generateAudioLinks(const json& jsonResponse) {
         }
     }
     
-    // if (!cantoneseText.empty()) {
-    //     std::string cantonese_audio_link = generateSpeech(cantoneseText, "cantonese", "alloy");
-    //     if (!cantonese_audio_link.empty()) {
-    //         result["cantonese_audio_link"] = cantonese_audio_link;
-    //     }
-    // }
+    if (!cantoneseText.empty()) {
+        std::string cantonese_audio_link = generateSpeechGoogle(cantoneseText, "yue-HK", "yue-HK-Standard-A");
+        if (!cantonese_audio_link.empty()) {
+            result["cantonese_audio_link"] = cantonese_audio_link;
+        }
+    }
 
     LLM_LOG_INFO("Generated audio links: {}", result.dump());
     return result;
 }
+
+/**
+ * Generate speech using Google Cloud Text-to-Speech API
+ * 
+ * @param text The text to convert to speech
+ * @param languageCode The language code (e.g., "en-US", "zh-CN", "yue-Hant-HK")
+ * @param voice The voice name (e.g., "en-US-Standard-A")
+ * @return std::string containing the filename of the generated audio file
+ */
+std::string generateSpeechGoogle(const std::string& text, const std::string& languageCode, const std::string& voice) {
+    // Get API key from environment variable
+    const char* google_api_key = std::getenv("GOOGLE_TTS_API_KEY");
+    if (!google_api_key) {
+        LLM_LOG_ERROR("GOOGLE_TTS_API_KEY environment variable not set");
+        return "";
+    }
+    
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        LLM_LOG_ERROR("Error initializing CURL");
+        return "";
+    }
+
+    std::string response_data;
+    
+    // Create JSON payload for Google TTS API
+    json payload = {
+        {"input", {
+            {"text", text}
+        }},
+        {"voice", {
+            {"languageCode", languageCode},
+            {"name", voice}
+        }},
+        {"audioConfig", {
+            {"audioEncoding", "MP3"}
+        }}
+    };
+    
+    std::string json_payload = payload.dump();
+    LLM_LOG_DEBUG("Google TTS request payload: {}", json_payload);
+    
+    // Google Cloud TTS endpoint
+    std::string url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=";
+    url += google_api_key;
+    
+    // Set up headers
+    struct curl_slist* headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_payload.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_data);
+
+    LLM_LOG_INFO("Generating speech with Google TTS for text: {}", text);
+    
+    // Perform the request
+    CURLcode res = curl_easy_perform(curl);
+    
+    // Clean up CURL
+    curl_easy_cleanup(curl);
+    curl_slist_free_all(headers);
+    
+    if (res != CURLE_OK) {
+        LLM_LOG_ERROR("Google TTS API request failed: {}", curl_easy_strerror(res));
+        return "";
+    }
+    
+    try {
+        // Parse JSON response
+        json response = json::parse(response_data);
+        
+        // Google returns base64-encoded audio content
+        if (!response.contains("audioContent")) {
+            LLM_LOG_ERROR("Google TTS API response missing audioContent: {}", response_data);
+            return "";
+        }
+        
+        // Decode base64 content
+        std::string base64_audio = response["audioContent"].get<std::string>();
+        std::string decoded_audio = base64_decode(base64_audio);
+        
+        // Generate a unique filename with UUID
+        std::string filename = "speech_google_" + generateUUID() + ".mp3";
+        
+        // Write to file
+        std::ofstream outfile(filename, std::ios::binary);
+        if (!outfile.is_open()) {
+            LLM_LOG_ERROR("Could not open file for writing: {}", filename);
+            return "";
+        }
+        
+        outfile.write(decoded_audio.data(), decoded_audio.size());
+        outfile.close();
+        
+        if (outfile.fail()) {
+            LLM_LOG_ERROR("Error writing to output file");
+            return "";
+        }
+        
+        LLM_LOG_INFO("Google TTS speech generated and saved to: {}", filename);
+        return filename;
+        
+    } catch (const std::exception& e) {
+        LLM_LOG_ERROR("Error processing Google TTS response: {}", e.what());
+        return "";
+    }
+}
+
+/**
+ * Helper function to decode base64 string to binary data
+ * 
+ * @param encoded The base64-encoded string
+ * @return The decoded binary data as a string
+ */
+std::string base64_decode(const std::string& encoded) {
+    BIO* bio = BIO_new_mem_buf(encoded.c_str(), -1);
+    BIO* b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    bio = BIO_push(b64, bio);
+    
+    char* buffer = new char[encoded.size()];
+    int decoded_size = BIO_read(bio, buffer, encoded.size());
+    
+    std::string result(buffer, decoded_size);
+    
+    delete[] buffer;
+    BIO_free_all(bio);
+    
+    return result;
+}
+
+
