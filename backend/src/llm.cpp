@@ -11,9 +11,24 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
+#include "../../common/include/logger.h"
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
+
+// Module-level static logger initialization
+static std::shared_ptr<spdlog::logger> getLLMLogger() {
+    static std::shared_ptr<spdlog::logger> logger = hansnap::Logger::getInstance().createLogger("llm");
+    return logger;
+}
+
+// Convenience macros
+#define LLM_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_INFO(...) SPDLOG_LOGGER_INFO(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_WARNING(...) SPDLOG_LOGGER_WARN(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(getLLMLogger(), __VA_ARGS__)
 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t total_size = size * nmemb;
@@ -35,7 +50,7 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
     // Get API key from environment variable
     const char* api_key = std::getenv("LLM_API_KEY");
     if (!api_key) {
-        std::cerr << "Error: LLM_API_KEY environment variable not set." << std::endl;
+        LLM_LOG_ERROR("LLM_API_KEY environment variable not set");
         return "ERROR: API key not found in environment variables";
     }
     
@@ -44,7 +59,7 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
     
     if (curl) {
         std::string url = "https://api.openai.com/v1/chat/completions";
-        std::cout << "Calling ChatGPT API..." << std::endl;
+        LLM_LOG_INFO("Calling ChatGPT API...");
         
         // Create JSON payload using nlohmann/json
         json payload = {

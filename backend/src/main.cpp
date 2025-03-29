@@ -1,13 +1,27 @@
 #include <drogon/drogon.h>
 #include <curl/curl.h>  // Add this for CURL_GLOBAL_ALL
 #include "../include/llm.h"  // Include the LLM header
-#include "logger.h"
+#include "../../common/include/logger.h"
+
+// Module-level static logger initialization for main
+static std::shared_ptr<spdlog::logger> getMainLogger() {
+    static std::shared_ptr<spdlog::logger> logger = hansnap::Logger::getInstance().createLogger("main");
+    return logger;
+}
+
+// Convenience macros
+#define MAIN_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(getMainLogger(), __VA_ARGS__)
+#define MAIN_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(getMainLogger(), __VA_ARGS__)
+#define MAIN_LOG_INFO(...) SPDLOG_LOGGER_INFO(getMainLogger(), __VA_ARGS__)
+#define MAIN_LOG_WARNING(...) SPDLOG_LOGGER_WARN(getMainLogger(), __VA_ARGS__)
+#define MAIN_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(getMainLogger(), __VA_ARGS__)
+#define MAIN_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(getMainLogger(), __VA_ARGS__)
 
 int main() {
-    // Initialize the logger first thing
+    // Initialize the main logger
     hansnap::Logger::getInstance().initialize("hansnap_backend");
     
-    // Set log level based on environment 
+    // Configure log level
     const char* log_level = std::getenv("LOG_LEVEL");
     if (log_level) {
         std::string level(log_level);
@@ -21,7 +35,12 @@ int main() {
     // Add file logging
     hansnap::Logger::getInstance().addFileLogger("backend.log");
     
-    LOG_INFO("Starting Hansnap backend server...");
+    // Initialize component loggers
+    auto llm_logger = hansnap::Logger::getInstance().createLogger("llm");
+    auto db_logger = hansnap::Logger::getInstance().createLogger("database");
+    auto api_logger = hansnap::Logger::getInstance().createLogger("api");
+    
+    MAIN_LOG_INFO("Starting Hansnap backend server...");
     
     // Initialize libcurl at application startup
     curl_global_init(CURL_GLOBAL_ALL);
@@ -136,5 +155,6 @@ int main() {
     
     // Clean up libcurl at application shutdown
     curl_global_cleanup();
+    spdlog::shutdown();
     return 0;
 }

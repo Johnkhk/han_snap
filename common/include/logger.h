@@ -207,12 +207,12 @@ private:
     std::mutex m_mutex;
 };
 
-// Global logging convenience macros
-#define LOG_TRACE(...) SPDLOG_TRACE(__VA_ARGS__)
-#define LOG_DEBUG(...) SPDLOG_DEBUG(__VA_ARGS__)
-#define LOG_INFO(...) SPDLOG_INFO(__VA_ARGS__)
-#define LOG_WARNING(...) SPDLOG_WARN(__VA_ARGS__)
-#define LOG_ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
-#define LOG_CRITICAL(...) SPDLOG_CRITICAL(__VA_ARGS__)
+// Use prefixed macro names instead of generic ones
+#define HANSNAP_LOG_TRACE(...) SPDLOG_TRACE(__VA_ARGS__)
+#define HANSNAP_LOG_DEBUG(...) SPDLOG_DEBUG(__VA_ARGS__)
+#define HANSNAP_LOG_INFO(...) SPDLOG_INFO(__VA_ARGS__)
+#define HANSNAP_LOG_WARNING(...) SPDLOG_WARN(__VA_ARGS__)
+#define HANSNAP_LOG_ERROR(...) SPDLOG_ERROR(__VA_ARGS__)
+#define HANSNAP_LOG_CRITICAL(...) SPDLOG_CRITICAL(__VA_ARGS__)
 
 } // namespace hansnap 

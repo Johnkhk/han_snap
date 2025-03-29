@@ -5,17 +5,23 @@
 #include <stdexcept>
 #include <fstream>
 
-// Component-specific logging macros
-#define DB_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(m_logger, __VA_ARGS__)
-#define DB_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(m_logger, __VA_ARGS__)
-#define DB_LOG_INFO(...) SPDLOG_LOGGER_INFO(m_logger, __VA_ARGS__)
-#define DB_LOG_WARNING(...) SPDLOG_LOGGER_WARN(m_logger, __VA_ARGS__)
-#define DB_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(m_logger, __VA_ARGS__)
-#define DB_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(m_logger, __VA_ARGS__)
+// Module-level static logger initialization
+static std::shared_ptr<spdlog::logger> getDBLogger() {
+    static std::shared_ptr<spdlog::logger> logger = hansnap::Logger::getInstance().createLogger("database");
+    return logger;
+}
+
+// Convenience macros
+#define DB_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(getDBLogger(), __VA_ARGS__)
+#define DB_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(getDBLogger(), __VA_ARGS__)
+#define DB_LOG_INFO(...) SPDLOG_LOGGER_INFO(getDBLogger(), __VA_ARGS__)
+#define DB_LOG_WARNING(...) SPDLOG_LOGGER_WARN(getDBLogger(), __VA_ARGS__)
+#define DB_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(getDBLogger(), __VA_ARGS__)
+#define DB_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(getDBLogger(), __VA_ARGS__)
 
 Database::Database() : port(33060) {
-    // Get the component logger
-    m_logger = hansnap::Logger::getInstance().createLogger("database");
+    // Constructor code
+    DB_LOG_DEBUG("Database instance created");
     
     loadConfig();
 }
