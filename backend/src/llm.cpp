@@ -15,6 +15,7 @@
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 #include <openssl/evp.h>  // Add this line for base64 functions
+#include "../include/model.h"
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
@@ -130,7 +131,12 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
     return response_data;
 }
 
-// Parse JSON response and return just the JSON content (not the OpenAI wrapper)
+/**
+ * Extract the actual JSON content from the OpenAI API response
+ * 
+ * @param rawResponse The full raw response from OpenAI
+ * @return Just the message content as JSON string
+ */
 std::string extractJSONContent(const std::string& rawResponse) {
     try {
         LLM_LOG_DEBUG("Raw API response: {}", rawResponse);
@@ -152,8 +158,12 @@ std::string extractJSONContent(const std::string& rawResponse) {
             // Validate that the content is valid JSON
             try {
                 json parsed = json::parse(content);
-                parsed = generateAudioLinks(parsed);  // Add audio links to the JSON
-                return parsed.dump();
+                
+                // Just return the parsed content without adding audio
+                std::string jsonString = parsed.dump();
+                LLM_LOG_DEBUG("Extracted JSON content: {}", jsonString);
+                return jsonString;
+                
             } catch (const json::parse_error& e) {
                 return "{ \"error\": \"Invalid JSON in response content: " + std::string(e.what()) + "\" }";
             }
@@ -200,28 +210,25 @@ std::string generateSpeech(const std::string& text, const std::string& language,
         return "";
     }
 
-    // Create JSON payload for TTS API
+    // Create JSON payload
     json payload = {
         {"model", "tts-1"},
         {"input", text},
-        {"language", language},
-        {"voice", voice},
-        // {"instructions", "Speak in cantonese"},
-        {"response_format", "mp3"}
+        {"voice", voice}
     };
     
     std::string json_payload = payload.dump();
+    
+    // TTS endpoint
     std::string url = "https://api.openai.com/v1/audio/speech";
     
     // Set up headers
     struct curl_slist* headers = NULL;
     headers = curl_slist_append(headers, "Content-Type: application/json");
-    
     std::string auth_header = "Authorization: Bearer ";
     auth_header += api_key;
     headers = curl_slist_append(headers, auth_header.c_str());
-
-    // Use the basic WriteCallback we already have
+    
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -243,26 +250,37 @@ std::string generateSpeech(const std::string& text, const std::string& language,
         return "";
     }
     
-    // Generate a unique filename with UUID
+    // Generate a unique filename
     std::string filename = "speech_" + generateUUID() + ".mp3";
     
-    // Now that we have the data in memory, write it to a file
+    // Save to file first
     std::ofstream outfile(filename, std::ios::binary);
-    if (!outfile.is_open()) {
-        LLM_LOG_ERROR("Could not open file for writing: {}", filename);
-        return "";
+    if (outfile.is_open()) {
+        outfile.write(response_data.data(), response_data.size());
+        outfile.close();
+        LLM_LOG_INFO("Audio saved to file: {}", filename);
+    } else {
+        LLM_LOG_ERROR("Failed to save audio to file: {}", filename);
     }
     
-    outfile.write(response_data.data(), response_data.size());
-    outfile.close();
+    // Convert binary data to base64
+    BIO* b64 = BIO_new(BIO_f_base64());
+    BIO* mem = BIO_new(BIO_s_mem());
+    BIO_push(b64, mem);
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
     
-    if (outfile.fail()) {
-        LLM_LOG_ERROR("Error writing to output file");
-        return "";
-    }
+    BIO_write(b64, response_data.data(), response_data.size());
+    BIO_flush(b64);
     
-    LLM_LOG_INFO("Speech generated and saved to: {}", filename);
-    return filename;
+    BUF_MEM* bptr;
+    BIO_get_mem_ptr(b64, &bptr);
+    
+    std::string base64_audio(bptr->data, bptr->length);
+    
+    BIO_free_all(b64);
+    
+    LLM_LOG_INFO("Generated base64 audio data of length: {}", base64_audio.length());
+    return base64_audio;
 }
 
 /**
@@ -288,22 +306,26 @@ json generateAudioLinks(const json& jsonResponse) {
         cantoneseText = result["equivalent_cantonese"].get<std::string>();
     }
     
-    // Generate audio files only if we have text
+    // Generate audio data only if we have text
     if (!mandarinText.empty()) {
-        std::string mandarin_audio_link = generateSpeech(mandarinText, "mandarin", "alloy");
-        if (!mandarin_audio_link.empty()) {
-            result["mandarin_audio_link"] = mandarin_audio_link;
+        std::string mandarin_audio_base64 = generateSpeech(mandarinText, "mandarin", "alloy");
+        if (!mandarin_audio_base64.empty()) {
+            LLM_LOG_INFO("Generated Mandarin audio data of length: {}", mandarin_audio_base64.length());
+            result["mandarin_audio_data"] = mandarin_audio_base64;
         }
     }
     
     if (!cantoneseText.empty()) {
-        std::string cantonese_audio_link = generateSpeechGoogle(cantoneseText, "yue-HK", "yue-HK-Standard-A");
-        if (!cantonese_audio_link.empty()) {
-            result["cantonese_audio_link"] = cantonese_audio_link;
+        std::string cantonese_audio_base64 = generateSpeechGoogle(cantoneseText, "yue-HK", "yue-HK-Standard-A");
+        if (!cantonese_audio_base64.empty()) {
+            LLM_LOG_INFO("Generated Cantonese audio data of length: {}", cantonese_audio_base64.length());
+            result["cantonese_audio_data"] = cantonese_audio_base64;
         }
     }
 
-    LLM_LOG_INFO("Generated audio links: {}", result.dump());
+
+
+    LLM_LOG_INFO("Generated audio data in response");
     return result;
 }
 
@@ -387,30 +409,24 @@ std::string generateSpeechGoogle(const std::string& text, const std::string& lan
             return "";
         }
         
-        // Decode base64 content
+        // Get the base64 audio content
         std::string base64_audio = response["audioContent"].get<std::string>();
-        std::string decoded_audio = base64_decode(base64_audio);
         
-        // Generate a unique filename with UUID
+        // Also decode and save to file
+        std::string decoded_audio = base64_decode(base64_audio);
         std::string filename = "speech_google_" + generateUUID() + ".mp3";
         
-        // Write to file
         std::ofstream outfile(filename, std::ios::binary);
-        if (!outfile.is_open()) {
-            LLM_LOG_ERROR("Could not open file for writing: {}", filename);
-            return "";
+        if (outfile.is_open()) {
+            outfile.write(decoded_audio.data(), decoded_audio.size());
+            outfile.close();
+            LLM_LOG_INFO("Google audio saved to file: {}", filename);
+        } else {
+            LLM_LOG_ERROR("Failed to save Google audio to file: {}", filename);
         }
         
-        outfile.write(decoded_audio.data(), decoded_audio.size());
-        outfile.close();
-        
-        if (outfile.fail()) {
-            LLM_LOG_ERROR("Error writing to output file");
-            return "";
-        }
-        
-        LLM_LOG_INFO("Google TTS speech generated and saved to: {}", filename);
-        return filename;
+        LLM_LOG_INFO("Generated base64 audio data of length: {}", base64_audio.length());
+        return base64_audio;
         
     } catch (const std::exception& e) {
         LLM_LOG_ERROR("Error processing Google TTS response: {}", e.what());
@@ -438,6 +454,55 @@ std::string base64_decode(const std::string& encoded) {
     delete[] buffer;
     BIO_free_all(bio);
     
+    return result;
+}
+
+/**
+ * Add audio data to translation JSON
+ * 
+ * @param translationJson The translation JSON to enhance with audio
+ * @return Enhanced JSON with audio data
+ */
+json addAudioToJson(const json& translationJson) {
+    json result = translationJson;  // Make a copy to modify
+    
+    // Extract texts from the JSON
+    std::string mandarinText = "";
+    std::string cantoneseText = "";
+    
+    LLM_LOG_DEBUG("Adding audio to translation JSON: {}", result.dump());
+    
+    if (result.contains("original_text")) {
+        mandarinText = result["original_text"].get<std::string>();
+    }
+    
+    if (result.contains("equivalent_cantonese")) {
+        cantoneseText = result["equivalent_cantonese"].get<std::string>();
+    }
+    
+    // Generate audio data if we have text
+    if (!mandarinText.empty()) {
+        std::string mandarin_audio_base64 = generateSpeech(mandarinText, "mandarin", "alloy");
+        if (!mandarin_audio_base64.empty()) {
+            result["mandarin_audio_data"] = mandarin_audio_base64;
+            LLM_LOG_INFO("Added mandarin audio data of length: {}", mandarin_audio_base64.length());
+        } else {
+            LLM_LOG_ERROR("Failed to generate mandarin audio");
+        }
+    }
+    
+    if (!cantoneseText.empty()) {
+        std::string cantonese_audio_base64 = generateSpeechGoogle(
+            cantoneseText, "yue-HK", "yue-HK-Standard-A");
+        if (!cantonese_audio_base64.empty()) {
+            result["cantonese_audio_data"] = cantonese_audio_base64;
+            LLM_LOG_INFO("Added cantonese audio data of length: {}", cantonese_audio_base64.length());
+        } else {
+            LLM_LOG_ERROR("Failed to generate cantonese audio");
+        }
+    }
+    
+    LLM_LOG_INFO("Translation JSON enhanced with audio data");
     return result;
 }
 

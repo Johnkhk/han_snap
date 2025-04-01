@@ -66,7 +66,7 @@ int main() {
         },
         {drogon::Get});
 
-    // LLM route - Fix handler signature and JSON handling
+    // LLM route
     drogon::app().registerHandler("/llm", 
         [](const drogon::HttpRequestPtr& req, 
            std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
@@ -76,7 +76,7 @@ int main() {
             auto resp = drogon::HttpResponse::newHttpResponse();
             
             try {
-                // Fix: Convert string_view to string explicitly
+                // Convert string_view to string explicitly
                 std::string_view bodyView = req->getBody();
                 std::string reqBody(bodyView);  // Explicit conversion
                 
@@ -112,9 +112,7 @@ int main() {
                     return;
                 }
                 
-                
-                // Create a more detailed prompt for translation
-                // TODO: Use a prompt file and load it
+                // Create prompt for translation
                 std::string prompt = "Translate the Chinese text \n\n'" + text + "'\n\nto English. Include:\n"
                                     "- Original text\n"
                                     "- English meaning\n"
@@ -122,16 +120,25 @@ int main() {
                                     "- Cantonese pronunciation (jyutping)\n"
                                     "- Cantonese equivalent phrase if different from input";
 
-                // Call the GPT API using the simplified structured response template
+                // Get translation
                 Translation translation = getStructuredResponse<Translation>(prompt);
-
-                // Convert Translation to JSON and wrap with original text
+                
+                // Convert Translation to JSON
+                json translationJson = translation;
+                
+                // Add audio data to the translation JSON
+                json enhancedJson = addAudioToJson(translationJson);
+                
+                // Wrap with original text in the final response
                 json responseJson = {
                     {"translation", json{
                         {"text", text},           // Add the original text
-                        {"result", translation}   // The translation struct will be converted to JSON automatically
+                        {"result", enhancedJson}  // The enhanced translation
                     }}
                 };
+
+                // Log the final response JSON before returning
+                std::string finalResponse = responseJson.dump();
 
                 // Set the JSON response
                 resp->setContentTypeCode(drogon::CT_APPLICATION_JSON);

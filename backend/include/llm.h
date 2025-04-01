@@ -30,6 +30,14 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
 std::string extractJSONContent(const std::string& rawResponse);
 
 /**
+ * Generate audio for translation text and add it to the JSON
+ * 
+ * @param translationJson The translation JSON to enhance with audio
+ * @return Enhanced JSON with audio data
+ */
+json addAudioToJson(const json& translationJson);
+
+/**
  * Get a structured response directly into a C++ struct or any type that can be
  * deserialized from JSON using nlohmann_json.
  * 
@@ -39,17 +47,17 @@ std::string extractJSONContent(const std::string& rawResponse);
 template<typename T>
 T getStructuredResponse(const std::string& prompt) {
     // Generate a simple description of what we need
-    // std::cout << "Prompt: " << prompt << std::endl;
     json schema = T::responseSchema();
     std::string json_response = callChatGPTForJSON(prompt, schema); 
     // Extract just the content part
     std::string json_content = extractJSONContent(json_response);
     
-    // Parse into the type
+    // Parse into JSON and convert to the target type
     try {
-        return json::parse(json_content).get<T>();
+        json parsed = json::parse(json_content);
+        return parsed.get<T>();
     } catch (const std::exception& e) {
-        std::cerr << "Error deserializing response: " << e.what() << std::endl;
+        std::cerr << "Error processing response: " << e.what() << std::endl;
         return T(); // Return default-constructed object
     }
 }
