@@ -429,7 +429,6 @@ void MainFrame::OnClipboardText(const wxString& text, const wxDateTime& timestam
     
     json response = GetLLMResponse(text);
     
-    std::cout << "Response: " << response << std::endl;
     UpdateUIWithTranslation(response);
     RequestUserAttention(wxUSER_ATTENTION_INFO);
 }
