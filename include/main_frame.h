@@ -78,4 +78,15 @@ private:
 
     // Add this line to your existing member variables
     wxPanel* m_waitingPanel;
+
+    wxButton* m_mandarinPlayButton;
+    wxButton* m_cantonesePlayButton;
+    std::string m_mandarinAudioData;
+    std::string m_cantoneseAudioData;
+    std::deque<wxString> m_tempAudioFiles;
+
+    void OnPlayMandarin(wxCommandEvent& event);
+    void OnPlayCantonese(wxCommandEvent& event);
+    void PlayAudio(const std::string& base64Data, const std::string& prefix);
+    void CleanupTempAudioFiles();
 }; 

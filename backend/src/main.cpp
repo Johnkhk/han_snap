@@ -114,7 +114,6 @@ int main() {
                 
                 // Create prompt for translation
                 std::string prompt = "Translate the Chinese text \n\n'" + text + "'\n\nto English. Include:\n"
-                                    "- Original text\n"
                                     "- English meaning\n"
                                     "- Mandarin pronunciation (pinyin)\n"
                                     "- Cantonese pronunciation (jyutping)\n"
@@ -125,6 +124,9 @@ int main() {
                 
                 // Convert Translation to JSON
                 json translationJson = translation;
+
+                // Add original text to the translation JSON
+                translationJson["original_text"] = text;
                 
                 // Add audio data to the translation JSON
                 json enhancedJson = addAudioToJson(translationJson);

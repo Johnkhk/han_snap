@@ -2,6 +2,11 @@
 #include "../include/ocr.h"
 #include "../include/http_client.h"
 #include <nlohmann/json.hpp>
+#include <wx/sound.h>
+#include "../include/base64.h"
+#include <fstream>
+#include <wx/stdpaths.h>
+#include <wx/filename.h>
 
 using json = nlohmann::json;
 
@@ -164,6 +169,15 @@ MainFrame::MainFrame()
     leftBox->Add(chineseLabel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
     leftBox->Add(m_originalText, 2, wxEXPAND | wxALL, 5);
     
+    // Add play button for Mandarin
+    m_mandarinPlayButton = new wxButton(leftBox->GetStaticBox(), wxID_ANY, "🔊 Play", 
+                                       wxDefaultPosition, wxDefaultSize);
+    m_mandarinPlayButton->Bind(wxEVT_BUTTON, &MainFrame::OnPlayMandarin, this);
+    m_mandarinPlayButton->Disable(); // Initially disable until we have audio
+    
+    // Add the Mandarin play button to the left box after the original text
+    leftBox->Add(m_mandarinPlayButton, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
+    
     // Right panel (Cantonese with Jyutping)
     wxStaticBoxSizer* rightBox = new wxStaticBoxSizer(wxVERTICAL, m_translationPanel, "");
     rightBox->GetStaticBox()->SetFont(boxFont);
@@ -190,6 +204,12 @@ MainFrame::MainFrame()
     m_cantoneseText->SetBackgroundColour(wxColour(245, 245, 250));  // Very light purple background
     m_cantoneseText->SetFont(chineseFont);
     
+    // Add play button for Cantonese
+    m_cantonesePlayButton = new wxButton(rightBox->GetStaticBox(), wxID_ANY, "🔊 Play", 
+                                        wxDefaultPosition, wxDefaultSize);
+    m_cantonesePlayButton->Bind(wxEVT_BUTTON, &MainFrame::OnPlayCantonese, this);
+    m_cantonesePlayButton->Disable(); // Initially disable until we have audio
+    
     // Add controls to right box (jyutping directly above cantonese text)
     rightBox->Add(m_jyutpingText, 1, wxEXPAND | wxALL, 5);
     
@@ -200,6 +220,7 @@ MainFrame::MainFrame()
     rightBox->Add(cantoneseTextLabel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
     
     rightBox->Add(m_cantoneseText, 2, wxEXPAND | wxALL, 5);
+    rightBox->Add(m_cantonesePlayButton, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
     
     // Add both panels to the horizontal sizer
     horizontalSizer->Add(leftBox, 1, wxEXPAND | wxALL, 5);
@@ -281,6 +302,13 @@ MainFrame::~MainFrame()
         m_taskBarIcon->RemoveIcon();
         delete m_taskBarIcon;
     }
+    
+    // Delete any remaining temp audio files
+    for (const wxString& file : m_tempAudioFiles) {
+        if (wxFileExists(file)) {
+            wxRemoveFile(file);
+        }
+    }
 }
 
 void MainFrame::ShowWaitingMessage()
@@ -353,6 +381,24 @@ void MainFrame::UpdateUIWithTranslation(const json& response)
             std::string cantoneseStr = result["equivalent_cantonese"].get<std::string>();
             wxString cantonese = wxString::FromUTF8(cantoneseStr);
             m_cantoneseText->ChangeValue(cantonese);
+        }
+        
+        // Handle audio data
+        m_mandarinAudioData = "";
+        m_cantoneseAudioData = "";
+        
+        if (result.contains("mandarin_audio_data")) {
+            m_mandarinAudioData = result["mandarin_audio_data"].get<std::string>();
+            m_mandarinPlayButton->Enable(true);
+        } else {
+            m_mandarinPlayButton->Disable();
+        }
+        
+        if (result.contains("cantonese_audio_data")) {
+            m_cantoneseAudioData = result["cantonese_audio_data"].get<std::string>();
+            m_cantonesePlayButton->Enable(true);
+        } else {
+            m_cantonesePlayButton->Disable();
         }
         
         // Scroll all text controls to top
@@ -484,4 +530,72 @@ void MainFrame::ShowTranslating() {
     m_waitingMessage->SetLabel("Translating...");
     m_mainPanel->Layout();
     wxYield();
+}
+
+void MainFrame::OnPlayMandarin(wxCommandEvent& event)
+{
+    PlayAudio(m_mandarinAudioData, "mandarin");
+}
+
+void MainFrame::OnPlayCantonese(wxCommandEvent& event)
+{
+    PlayAudio(m_cantoneseAudioData, "cantonese");
+}
+
+void MainFrame::PlayAudio(const std::string& base64Data, const std::string& prefix)
+{
+    if (base64Data.empty()) {
+        wxLogWarning("No audio data available to play");
+        return;
+    }
+    
+    try {
+        // Decode base64 data
+        std::string binaryData = base64_decode(base64Data);
+        
+        // Create temp file path
+        wxString tempDir = wxStandardPaths::Get().GetTempDir();
+        wxString tempFile = wxFileName::CreateTempFileName(
+            tempDir + wxFILE_SEP_PATH + "hansnap_" + prefix);
+        
+        // Add mp3 extension
+        tempFile += ".mp3";
+        
+        // Write binary data to file
+        std::ofstream outFile(tempFile.ToStdString(), std::ios::binary);
+        if (!outFile) {
+            wxLogError("Failed to create temporary audio file");
+            return;
+        }
+        outFile.write(binaryData.data(), binaryData.size());
+        outFile.close();
+        
+        // Play the audio file
+        wxSound sound(tempFile);
+        if (sound.IsOk()) {
+            sound.Play(wxSOUND_ASYNC);
+            
+            // Store the filename to delete later
+            m_tempAudioFiles.push_back(tempFile);
+            
+            // Clean up older temp files (keep last 10)
+            CleanupTempAudioFiles();
+        } else {
+            wxLogError("Failed to play audio file");
+        }
+    } catch (const std::exception& e) {
+        wxLogError("Error playing audio: %s", e.what());
+    }
+}
+
+void MainFrame::CleanupTempAudioFiles()
+{
+    // Keep only the last 10 temp files
+    while (m_tempAudioFiles.size() > 10) {
+        wxString fileToRemove = m_tempAudioFiles.front();
+        if (wxFileExists(fileToRemove)) {
+            wxRemoveFile(fileToRemove);
+        }
+        m_tempAudioFiles.pop_front();
+    }
 }

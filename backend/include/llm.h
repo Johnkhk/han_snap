@@ -2,7 +2,20 @@
 
 #include <string>
 #include <nlohmann/json.hpp>
+#include <memory>  // For std::shared_ptr
+#include "../../common/include/logger.h"  // For spdlog
 #include "model.h"  // Include model header for struct definitions
+
+// Declare the logger function first - this lets the macros know it exists
+std::shared_ptr<spdlog::logger> getLLMLogger();
+
+// Convenience macros
+#define LLM_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_INFO(...) SPDLOG_LOGGER_INFO(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_WARNING(...) SPDLOG_LOGGER_WARN(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(getLLMLogger(), __VA_ARGS__)
+#define LLM_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(getLLMLogger(), __VA_ARGS__)
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
@@ -49,15 +62,16 @@ T getStructuredResponse(const std::string& prompt) {
     // Generate a simple description of what we need
     json schema = T::responseSchema();
     std::string json_response = callChatGPTForJSON(prompt, schema); 
+    LLM_LOG_INFO("1111111111111111");
     // Extract just the content part
     std::string json_content = extractJSONContent(json_response);
-    
+    LLM_LOG_INFO("2222222222222222");
     // Parse into JSON and convert to the target type
     try {
         json parsed = json::parse(json_content);
         return parsed.get<T>();
     } catch (const std::exception& e) {
-        std::cerr << "Error processing response: " << e.what() << std::endl;
+        LLM_LOG_ERROR("Error processing response: {}", e.what());
         return T(); // Return default-constructed object
     }
 }

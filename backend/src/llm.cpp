@@ -16,23 +16,18 @@
 #include <openssl/buffer.h>
 #include <openssl/evp.h>  // Add this line for base64 functions
 #include "../include/model.h"
+#include "../include/llm.h"
+
 
 // Use the nlohmann json namespace
 using json = nlohmann::json;
 
 // Module-level static logger initialization
-static std::shared_ptr<spdlog::logger> getLLMLogger() {
+std::shared_ptr<spdlog::logger> getLLMLogger() {
     static std::shared_ptr<spdlog::logger> logger = hansnap::Logger::getInstance().createLogger("llm");
     return logger;
 }
 
-// Convenience macros
-#define LLM_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(getLLMLogger(), __VA_ARGS__)
-#define LLM_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(getLLMLogger(), __VA_ARGS__)
-#define LLM_LOG_INFO(...) SPDLOG_LOGGER_INFO(getLLMLogger(), __VA_ARGS__)
-#define LLM_LOG_WARNING(...) SPDLOG_LOGGER_WARN(getLLMLogger(), __VA_ARGS__)
-#define LLM_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(getLLMLogger(), __VA_ARGS__)
-#define LLM_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(getLLMLogger(), __VA_ARGS__)
 
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
     size_t total_size = size * nmemb;
@@ -52,7 +47,7 @@ std::string base64_decode(const std::string& encoded);
  * @param schemaJson The expected JSON schema for the response (can be empty json object)
  * @return Raw response from the API
  */
-std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson = json()) {
+std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson) {
     // Get API key from environment variable
     const char* api_key = std::getenv("LLM_API_KEY");
     if (!api_key) {
@@ -74,7 +69,7 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
             {"messages", json::array({
                 {
                     {"role", "system"},
-                    {"content", "You are an expert translator. You are given a text and you need to translate it into English. You will respond in JSON format with fields: meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese."}
+                    {"content", "You are an expert translator. You are given a text and you need to translate it into English. You will respond in JSON format with fields: original_text, meaning_english, pinyin_mandarin, jyutping_cantonese, equivalent_cantonese."}
                 },
                 {
                     {"role", "user"},
@@ -139,12 +134,14 @@ std::string callChatGPTForJSON(const std::string& prompt, const json& schemaJson
  */
 std::string extractJSONContent(const std::string& rawResponse) {
     try {
-        LLM_LOG_DEBUG("Raw API response: {}", rawResponse);
+        LLM_LOG_INFO("3333333333333333333");
+        LLM_LOG_INFO("Raw API response: {}", rawResponse);
         
         json response = json::parse(rawResponse);
         
         // Check if there's an error
         if (response.contains("error")) {
+            LLM_LOG_INFO("4444444444444444444");
             return "{ \"error\": \"" + response["error"]["message"].get<std::string>() + "\" }";
         }
         
@@ -154,6 +151,9 @@ std::string extractJSONContent(const std::string& rawResponse) {
             response["choices"][0]["message"].contains("content")) {
             
             std::string content = response["choices"][0]["message"]["content"].get<std::string>();
+
+            // log the content
+            LLM_LOG_INFO("Extracted JSON content STRING: {}", content);
             
             // Validate that the content is valid JSON
             try {
@@ -161,7 +161,7 @@ std::string extractJSONContent(const std::string& rawResponse) {
                 
                 // Just return the parsed content without adding audio
                 std::string jsonString = parsed.dump();
-                LLM_LOG_DEBUG("Extracted JSON content: {}", jsonString);
+                LLM_LOG_INFO("Extracted JSON content: {}", jsonString);
                 return jsonString;
                 
             } catch (const json::parse_error& e) {
